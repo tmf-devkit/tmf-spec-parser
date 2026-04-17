@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+*.egg
+# Cached specs (downloaded from GitHub) — add to .gitignore if you don't want
+# to commit them; remove if you want them tracked for reproducibility.
+# ~/.tmf-spec-parser/cache/ is the default; local overrides go here:
+cache/
+SPEC_CHANGES.md
