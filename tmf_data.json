@@ -1,0 +1,1472 @@
+{
+  "generated_at": "2026-04-18T18:03:33Z",
+  "parser_version": "0.2.0",
+  "apis": [
+    {
+      "id": "TMF629",
+      "name": "Customer Management",
+      "domain": "customer",
+      "short": "Customer Mgmt",
+      "repo": "TMF629_CustomerManagement"
+    },
+    {
+      "id": "TMF632",
+      "name": "Party Management",
+      "domain": "customer",
+      "short": "Party Mgmt",
+      "repo": "TMF632_PartyManagement"
+    },
+    {
+      "id": "TMF620",
+      "name": "Product Catalog",
+      "domain": "product",
+      "short": "Product Catalog",
+      "repo": "TMF620_ProductCatalog"
+    },
+    {
+      "id": "TMF622",
+      "name": "Product Ordering",
+      "domain": "product",
+      "short": "Product Ordering",
+      "repo": "TMF622_ProductOrder"
+    },
+    {
+      "id": "TMF637",
+      "name": "Product Inventory",
+      "domain": "product",
+      "short": "Product Inventory",
+      "repo": "TMF637_ProductInventory"
+    },
+    {
+      "id": "TMF633",
+      "name": "Service Catalog",
+      "domain": "service",
+      "short": "Service Catalog",
+      "repo": "TMF633_ServiceCatalog"
+    },
+    {
+      "id": "TMF638",
+      "name": "Service Inventory",
+      "domain": "service",
+      "short": "Service Inventory",
+      "repo": "TMF638_ServiceInventory"
+    },
+    {
+      "id": "TMF641",
+      "name": "Service Ordering",
+      "domain": "service",
+      "short": "Service Ordering",
+      "repo": "TMF641_ServiceOrder"
+    },
+    {
+      "id": "TMF645",
+      "name": "Service Qualification",
+      "domain": "service",
+      "short": "Service Qual",
+      "repo": "TMF645_ServiceQualification"
+    },
+    {
+      "id": "TMF634",
+      "name": "Resource Catalog",
+      "domain": "resource",
+      "short": "Resource Catalog",
+      "repo": "TMF634_ResourceCatalog"
+    },
+    {
+      "id": "TMF639",
+      "name": "Resource Inventory",
+      "domain": "resource",
+      "short": "Resource Inventory",
+      "repo": "TMF639_ResourceInventory"
+    },
+    {
+      "id": "TMF652",
+      "name": "Resource Ordering",
+      "domain": "resource",
+      "short": "Resource Ordering",
+      "repo": "TMF652_ResourceOrderManagement"
+    },
+    {
+      "id": "TMF653",
+      "name": "Service Test",
+      "domain": "resource",
+      "short": "Service Test",
+      "repo": "TMF653_ServiceTestManagement"
+    },
+    {
+      "id": "TMF621",
+      "name": "Trouble Ticket",
+      "domain": "engagement",
+      "short": "Trouble Ticket",
+      "repo": "TMF621_TroubleTicket"
+    },
+    {
+      "id": "TMF656",
+      "name": "Service Problem",
+      "domain": "engagement",
+      "short": "Service Problem",
+      "repo": "TMF656_ServiceProblemManagement"
+    },
+    {
+      "id": "TMF688",
+      "name": "Event Management",
+      "domain": "common",
+      "short": "Event Mgmt",
+      "repo": "TMF688-Event"
+    }
+  ],
+  "links": [
+    {
+      "source": "TMF622",
+      "target": "TMF620",
+      "label": "uses ProductOffering"
+    },
+    {
+      "source": "TMF622",
+      "target": "TMF620",
+      "label": "uses ProductSpec"
+    },
+    {
+      "source": "TMF622",
+      "target": "TMF632",
+      "label": "has RelatedParty"
+    },
+    {
+      "source": "TMF622",
+      "target": "TMF638",
+      "label": "creates Service"
+    },
+    {
+      "source": "TMF622",
+      "target": "TMF639",
+      "label": "references Resource"
+    },
+    {
+      "source": "TMF641",
+      "target": "TMF632",
+      "label": "has RelatedParty"
+    },
+    {
+      "source": "TMF641",
+      "target": "TMF633",
+      "label": "uses ServiceSpec"
+    },
+    {
+      "source": "TMF641",
+      "target": "TMF639",
+      "label": "references Resource"
+    },
+    {
+      "source": "TMF652",
+      "target": "TMF632",
+      "label": "has RelatedParty"
+    },
+    {
+      "source": "TMF652",
+      "target": "TMF634",
+      "label": "uses ResourceSpec"
+    },
+    {
+      "source": "TMF688",
+      "target": "TMF632",
+      "label": "has RelatedParty"
+    }
+  ],
+  "patterns": [
+    {
+      "id": "o2a",
+      "name": "Order-to-Activate",
+      "color": "#ff9f0a",
+      "nodes": [
+        "TMF629",
+        "TMF622",
+        "TMF641",
+        "TMF638",
+        "TMF639"
+      ],
+      "desc": "Customer → Product Order → Service Order → Service → Resource"
+    },
+    {
+      "id": "c2i",
+      "name": "Catalog-to-Inventory",
+      "color": "#5e9bff",
+      "nodes": [
+        "TMF620",
+        "TMF633",
+        "TMF634"
+      ],
+      "desc": "Sync catalog specifications with provisioned inventory instances"
+    },
+    {
+      "id": "t2r",
+      "name": "Trouble-to-Resolve",
+      "color": "#ff6b6b",
+      "nodes": [
+        "TMF621",
+        "TMF656",
+        "TMF638"
+      ],
+      "desc": "Incident detection → problem management → service resolution"
+    }
+  ],
+  "details": {
+    "TMF629": {
+      "specRef": "TMF629",
+      "description": "Manages customer accounts including profile, preferences, and account lifecycle.",
+      "entities": [
+        {
+          "name": "Customer",
+          "mandatory": [
+            "id",
+            "status",
+            "engagedParty"
+          ],
+          "optional": [
+            "name",
+            "customerRank",
+            "validFor",
+            "relatedParty",
+            "paymentMethod",
+            "contactMedium"
+          ]
+        }
+      ],
+      "lifecycle": [
+        "pending",
+        "approved",
+        "inactive",
+        "terminated"
+      ],
+      "terminal": [
+        "terminated"
+      ],
+      "transitions": [
+        {
+          "from": "pending",
+          "to": "approved"
+        },
+        {
+          "from": "pending",
+          "to": "inactive"
+        },
+        {
+          "from": "approved",
+          "to": "inactive"
+        },
+        {
+          "from": "inactive",
+          "to": "terminated"
+        }
+      ]
+    },
+    "TMF632": {
+      "specRef": "TMF632 v4.0.0",
+      "description": "Party Release : 19.",
+      "entities": [
+        {
+          "name": "Individual",
+          "mandatory": [
+            "id"
+          ],
+          "optional": [
+            "href",
+            "aristocraticTitle",
+            "birthDate",
+            "countryOfBirth",
+            "deathDate",
+            "familyName",
+            "familyNamePrefix",
+            "formattedName",
+            "fullName",
+            "gender",
+            "generation",
+            "givenName"
+          ]
+        },
+        {
+          "name": "Organization",
+          "mandatory": [
+            "id"
+          ],
+          "optional": [
+            "href",
+            "isHeadOffice",
+            "isLegalEntity",
+            "name",
+            "nameType",
+            "organizationType",
+            "tradingName",
+            "contactMedium",
+            "creditRating",
+            "existsDuring",
+            "externalReference",
+            "organizationChildRelationship"
+          ]
+        },
+        {
+          "name": "Attachment",
+          "mandatory": [],
+          "optional": [
+            "id",
+            "href",
+            "attachmentType",
+            "content",
+            "description",
+            "mimeType",
+            "name",
+            "url",
+            "size",
+            "validFor",
+            "@baseType",
+            "@schemaLocation"
+          ]
+        },
+        {
+          "name": "AttachmentRefOrValue",
+          "mandatory": [],
+          "optional": [
+            "id",
+            "href",
+            "attachmentType",
+            "content",
+            "description",
+            "mimeType",
+            "name",
+            "url",
+            "size",
+            "validFor",
+            "@baseType",
+            "@schemaLocation"
+          ]
+        }
+      ],
+      "lifecycle": [
+        "initialized",
+        "validated",
+        "deceaded"
+      ],
+      "terminal": [],
+      "transitions": []
+    },
+    "TMF620": {
+      "specRef": "TMF620",
+      "description": "Manages product offerings and product specifications available in the product catalog.",
+      "entities": [
+        {
+          "name": "ProductOffering",
+          "mandatory": [
+            "id",
+            "name",
+            "lifecycleStatus"
+          ],
+          "optional": [
+            "version",
+            "description",
+            "productSpecification",
+            "place",
+            "validFor"
+          ]
+        },
+        {
+          "name": "ProductSpecification",
+          "mandatory": [
+            "id",
+            "name",
+            "lifecycleStatus"
+          ],
+          "optional": [
+            "version",
+            "brand",
+            "productSpecCharacteristic",
+            "serviceSpecification"
+          ]
+        }
+      ],
+      "lifecycle": [
+        "inStudy",
+        "inDesign",
+        "inTest",
+        "active",
+        "launched",
+        "retired",
+        "obsolete"
+      ],
+      "terminal": [
+        "retired",
+        "obsolete"
+      ],
+      "transitions": [
+        {
+          "from": "inStudy",
+          "to": "inDesign"
+        },
+        {
+          "from": "inDesign",
+          "to": "inTest"
+        },
+        {
+          "from": "inTest",
+          "to": "active"
+        },
+        {
+          "from": "inTest",
+          "to": "inStudy"
+        },
+        {
+          "from": "active",
+          "to": "launched"
+        },
+        {
+          "from": "launched",
+          "to": "active"
+        },
+        {
+          "from": "launched",
+          "to": "retired"
+        },
+        {
+          "from": "launched",
+          "to": "obsolete"
+        },
+        {
+          "from": "retired",
+          "to": "obsolete"
+        }
+      ]
+    },
+    "TMF622": {
+      "specRef": "TMF622 v4.0.0",
+      "description": "Product Ordering Management Release : 19.",
+      "entities": [
+        {
+          "name": "ProductOrderItem",
+          "mandatory": [
+            "id",
+            "action"
+          ],
+          "optional": [
+            "quantity",
+            "appointment",
+            "billingAccount",
+            "itemPrice",
+            "itemTerm",
+            "itemTotalPrice",
+            "payment",
+            "product",
+            "productOffering",
+            "productOfferingQualificationItem",
+            "productOrderItem",
+            "productOrderItemRelationship"
+          ]
+        },
+        {
+          "name": "ProductOrder",
+          "mandatory": [
+            "productOrderItem"
+          ],
+          "optional": [
+            "id",
+            "href",
+            "cancellationDate",
+            "cancellationReason",
+            "category",
+            "completionDate",
+            "description",
+            "expectedCompletionDate",
+            "externalId",
+            "notificationContact",
+            "orderDate",
+            "priority"
+          ]
+        },
+        {
+          "name": "OrderPrice",
+          "mandatory": [],
+          "optional": [
+            "description",
+            "name",
+            "priceType",
+            "recurringChargePeriod",
+            "unitOfMeasure",
+            "billingAccount",
+            "price",
+            "priceAlteration",
+            "productOfferingPrice",
+            "@baseType",
+            "@schemaLocation",
+            "@type"
+          ]
+        },
+        {
+          "name": "PriceAlteration",
+          "mandatory": [
+            "priceType",
+            "price"
+          ],
+          "optional": [
+            "applicationDuration",
+            "description",
+            "name",
+            "priority",
+            "recurringChargePeriod",
+            "unitOfMeasure",
+            "productOfferingPrice",
+            "@baseType",
+            "@schemaLocation",
+            "@type"
+          ]
+        }
+      ],
+      "lifecycle": [
+        "acknowledged",
+        "rejected",
+        "pending",
+        "held",
+        "inProgress",
+        "cancelled",
+        "completed",
+        "failed",
+        "assessingCancellation",
+        "pendingCancellation"
+      ],
+      "terminal": [
+        "completed",
+        "failed",
+        "cancelled"
+      ],
+      "transitions": [
+        {
+          "from": "acknowledged",
+          "to": "inProgress"
+        },
+        {
+          "from": "acknowledged",
+          "to": "cancelled"
+        },
+        {
+          "from": "inProgress",
+          "to": "pending"
+        },
+        {
+          "from": "inProgress",
+          "to": "held"
+        },
+        {
+          "from": "inProgress",
+          "to": "completed"
+        },
+        {
+          "from": "inProgress",
+          "to": "failed"
+        },
+        {
+          "from": "inProgress",
+          "to": "cancelled"
+        },
+        {
+          "from": "pending",
+          "to": "inProgress"
+        },
+        {
+          "from": "held",
+          "to": "inProgress"
+        }
+      ]
+    },
+    "TMF637": {
+      "specRef": "TMF637",
+      "description": "Manages the inventory of product instances provisioned for customers.",
+      "entities": [
+        {
+          "name": "Product",
+          "mandatory": [
+            "id",
+            "status",
+            "productOffering"
+          ],
+          "optional": [
+            "name",
+            "description",
+            "startDate",
+            "endDate",
+            "productCharacteristic",
+            "realizingService",
+            "place"
+          ]
+        }
+      ],
+      "lifecycle": [
+        "created",
+        "pending",
+        "active",
+        "inactive",
+        "terminated"
+      ],
+      "terminal": [
+        "terminated"
+      ],
+      "transitions": [
+        {
+          "from": "created",
+          "to": "pending"
+        },
+        {
+          "from": "pending",
+          "to": "active"
+        },
+        {
+          "from": "pending",
+          "to": "inactive"
+        },
+        {
+          "from": "active",
+          "to": "inactive"
+        },
+        {
+          "from": "inactive",
+          "to": "active"
+        },
+        {
+          "from": "active",
+          "to": "terminated"
+        },
+        {
+          "from": "inactive",
+          "to": "terminated"
+        }
+      ]
+    },
+    "TMF633": {
+      "specRef": "TMF633",
+      "description": "Manages service specifications that define characteristics and behaviours of services.",
+      "entities": [
+        {
+          "name": "ServiceSpecification",
+          "mandatory": [
+            "id",
+            "name",
+            "lifecycleStatus"
+          ],
+          "optional": [
+            "version",
+            "description",
+            "validFor",
+            "serviceSpecCharacteristic",
+            "resourceSpecification"
+          ]
+        }
+      ],
+      "lifecycle": [
+        "inStudy",
+        "inDesign",
+        "inTest",
+        "active",
+        "launched",
+        "retired"
+      ],
+      "terminal": [
+        "retired"
+      ],
+      "transitions": [
+        {
+          "from": "inStudy",
+          "to": "inDesign"
+        },
+        {
+          "from": "inDesign",
+          "to": "inTest"
+        },
+        {
+          "from": "inTest",
+          "to": "active"
+        },
+        {
+          "from": "inTest",
+          "to": "inStudy"
+        },
+        {
+          "from": "active",
+          "to": "launched"
+        },
+        {
+          "from": "launched",
+          "to": "retired"
+        }
+      ]
+    },
+    "TMF638": {
+      "specRef": "TMF638",
+      "description": "Provides a queryable register of all instantiated services provisioned in the network.",
+      "entities": [
+        {
+          "name": "Service",
+          "mandatory": [
+            "id",
+            "name",
+            "state",
+            "serviceType"
+          ],
+          "optional": [
+            "startDate",
+            "endDate",
+            "serviceCharacteristic",
+            "serviceRelationship",
+            "supportingResource",
+            "place"
+          ]
+        }
+      ],
+      "lifecycle": [
+        "feasibilityChecked",
+        "designed",
+        "reserved",
+        "active",
+        "inactive",
+        "terminated"
+      ],
+      "terminal": [
+        "terminated"
+      ],
+      "transitions": [
+        {
+          "from": "feasibilityChecked",
+          "to": "designed"
+        },
+        {
+          "from": "designed",
+          "to": "reserved"
+        },
+        {
+          "from": "reserved",
+          "to": "active"
+        },
+        {
+          "from": "active",
+          "to": "inactive"
+        },
+        {
+          "from": "inactive",
+          "to": "active"
+        },
+        {
+          "from": "active",
+          "to": "terminated"
+        },
+        {
+          "from": "inactive",
+          "to": "terminated"
+        }
+      ]
+    },
+    "TMF641": {
+      "specRef": "TMF641 v4.0.0",
+      "description": "Service Ordering Management Version 4.",
+      "entities": [
+        {
+          "name": "Service",
+          "mandatory": [],
+          "optional": [
+            "id",
+            "href",
+            "category",
+            "description",
+            "endDate",
+            "hasStarted",
+            "isBundle",
+            "isServiceEnabled",
+            "isStateful",
+            "name",
+            "serviceDate",
+            "serviceType"
+          ]
+        },
+        {
+          "name": "ServiceOrder",
+          "mandatory": [],
+          "optional": [
+            "id",
+            "href",
+            "cancellationDate",
+            "cancellationReason",
+            "category",
+            "completionDate",
+            "description",
+            "expectedCompletionDate",
+            "externalId",
+            "notificationContact",
+            "orderDate",
+            "priority"
+          ]
+        },
+        {
+          "name": "ServiceRefOrValue",
+          "mandatory": [],
+          "optional": [
+            "id",
+            "href",
+            "category",
+            "description",
+            "endDate",
+            "hasStarted",
+            "isBundle",
+            "isServiceEnabled",
+            "isStateful",
+            "name",
+            "serviceDate",
+            "serviceType"
+          ]
+        },
+        {
+          "name": "ServiceOrderItem",
+          "mandatory": [
+            "id",
+            "action",
+            "service"
+          ],
+          "optional": [
+            "quantity",
+            "appointment",
+            "serviceOrderItem",
+            "serviceOrderItemRelationship",
+            "state",
+            "@baseType",
+            "@schemaLocation",
+            "@type"
+          ]
+        }
+      ],
+      "lifecycle": [
+        "feasibilityChecked",
+        "designed",
+        "reserved",
+        "inactive",
+        "active",
+        "terminated"
+      ],
+      "terminal": [
+        "completed",
+        "failed",
+        "cancelled"
+      ],
+      "transitions": [
+        {
+          "from": "acknowledged",
+          "to": "inProgress"
+        },
+        {
+          "from": "acknowledged",
+          "to": "cancelled"
+        },
+        {
+          "from": "inProgress",
+          "to": "pending"
+        },
+        {
+          "from": "inProgress",
+          "to": "held"
+        },
+        {
+          "from": "inProgress",
+          "to": "completed"
+        },
+        {
+          "from": "inProgress",
+          "to": "failed"
+        },
+        {
+          "from": "inProgress",
+          "to": "cancelled"
+        },
+        {
+          "from": "pending",
+          "to": "inProgress"
+        },
+        {
+          "from": "held",
+          "to": "inProgress"
+        }
+      ]
+    },
+    "TMF645": {
+      "specRef": "TMF645",
+      "description": "Determines technical and commercial feasibility of provisioning a service before an order is placed.",
+      "entities": [
+        {
+          "name": "ServiceQualification",
+          "mandatory": [
+            "id",
+            "state"
+          ],
+          "optional": [
+            "requestedResponseDate",
+            "serviceQualificationItem",
+            "relatedParty",
+            "expirationDate"
+          ]
+        }
+      ],
+      "lifecycle": [
+        "acknowledged",
+        "inProgress",
+        "done.unableToProvide",
+        "done.provideAlternative",
+        "done.standard"
+      ],
+      "terminal": [
+        "done.unableToProvide",
+        "done.provideAlternative",
+        "done.standard"
+      ],
+      "transitions": [
+        {
+          "from": "acknowledged",
+          "to": "inProgress"
+        },
+        {
+          "from": "inProgress",
+          "to": "done.standard"
+        },
+        {
+          "from": "inProgress",
+          "to": "done.provideAlternative"
+        },
+        {
+          "from": "inProgress",
+          "to": "done.unableToProvide"
+        }
+      ]
+    },
+    "TMF634": {
+      "specRef": "TMF634",
+      "description": "Manages resource specifications defining physical and logical network resource characteristics.",
+      "entities": [
+        {
+          "name": "ResourceSpecification",
+          "mandatory": [
+            "id",
+            "name",
+            "lifecycleStatus"
+          ],
+          "optional": [
+            "version",
+            "category",
+            "description",
+            "resourceSpecCharacteristic",
+            "resourceSpecRelationship"
+          ]
+        }
+      ],
+      "lifecycle": [
+        "inStudy",
+        "inDesign",
+        "inTest",
+        "active",
+        "launched",
+        "retired"
+      ],
+      "terminal": [
+        "retired"
+      ],
+      "transitions": [
+        {
+          "from": "inStudy",
+          "to": "inDesign"
+        },
+        {
+          "from": "inDesign",
+          "to": "inTest"
+        },
+        {
+          "from": "inTest",
+          "to": "active"
+        },
+        {
+          "from": "inTest",
+          "to": "inStudy"
+        },
+        {
+          "from": "active",
+          "to": "launched"
+        },
+        {
+          "from": "launched",
+          "to": "retired"
+        }
+      ]
+    },
+    "TMF639": {
+      "specRef": "TMF639",
+      "description": "Manages physical and logical resources — network elements, ports, circuits, IP addresses.",
+      "entities": [
+        {
+          "name": "Resource",
+          "mandatory": [
+            "id",
+            "name",
+            "resourceStatus"
+          ],
+          "optional": [
+            "resourceType",
+            "startOperatingDate",
+            "endOperatingDate",
+            "resourceCharacteristic",
+            "activationFeature",
+            "place"
+          ]
+        }
+      ],
+      "lifecycle": [
+        "standby",
+        "alarm",
+        "available",
+        "reserved",
+        "suspended",
+        "retired"
+      ],
+      "terminal": [
+        "retired"
+      ],
+      "transitions": [
+        {
+          "from": "standby",
+          "to": "available"
+        },
+        {
+          "from": "available",
+          "to": "reserved"
+        },
+        {
+          "from": "reserved",
+          "to": "available"
+        },
+        {
+          "from": "available",
+          "to": "suspended"
+        },
+        {
+          "from": "suspended",
+          "to": "available"
+        },
+        {
+          "from": "available",
+          "to": "alarm"
+        },
+        {
+          "from": "alarm",
+          "to": "available"
+        },
+        {
+          "from": "available",
+          "to": "retired"
+        },
+        {
+          "from": "reserved",
+          "to": "retired"
+        },
+        {
+          "from": "suspended",
+          "to": "retired"
+        }
+      ]
+    },
+    "TMF652": {
+      "specRef": "TMF652 v4.0.0",
+      "description": "environment TMF Resource Ordering Management specification",
+      "entities": [
+        {
+          "name": "Resource",
+          "mandatory": [
+            "id",
+            "href"
+          ],
+          "optional": [
+            "category",
+            "description",
+            "endOperatingDate",
+            "name",
+            "resourceVersion",
+            "startOperatingDate",
+            "administrativeState",
+            "attachment",
+            "note",
+            "operationalState",
+            "place",
+            "relatedParty"
+          ]
+        },
+        {
+          "name": "ResourceRefOrValue",
+          "mandatory": [
+            "id",
+            "href"
+          ],
+          "optional": [
+            "category",
+            "description",
+            "endOperatingDate",
+            "name",
+            "resourceVersion",
+            "startOperatingDate",
+            "administrativeState",
+            "attachment",
+            "note",
+            "operationalState",
+            "place",
+            "relatedParty"
+          ]
+        },
+        {
+          "name": "Attachment",
+          "mandatory": [],
+          "optional": [
+            "id",
+            "href",
+            "attachmentType",
+            "description",
+            "mimeType",
+            "name",
+            "url",
+            "size",
+            "validFor",
+            "@baseType",
+            "@schemaLocation",
+            "@type"
+          ]
+        },
+        {
+          "name": "AttachmentRefOrValue",
+          "mandatory": [],
+          "optional": [
+            "id",
+            "href",
+            "attachmentType",
+            "description",
+            "isRef",
+            "mimeType",
+            "name",
+            "url",
+            "size",
+            "validFor",
+            "@baseType",
+            "@schemaLocation"
+          ]
+        }
+      ],
+      "lifecycle": [
+        "standby",
+        "alarm",
+        "available",
+        "reserved",
+        "unknown",
+        "suspended"
+      ],
+      "terminal": [
+        "completed",
+        "failed",
+        "cancelled"
+      ],
+      "transitions": [
+        {
+          "from": "acknowledged",
+          "to": "inProgress"
+        },
+        {
+          "from": "acknowledged",
+          "to": "cancelled"
+        },
+        {
+          "from": "inProgress",
+          "to": "pending"
+        },
+        {
+          "from": "inProgress",
+          "to": "held"
+        },
+        {
+          "from": "inProgress",
+          "to": "completed"
+        },
+        {
+          "from": "inProgress",
+          "to": "failed"
+        },
+        {
+          "from": "inProgress",
+          "to": "cancelled"
+        },
+        {
+          "from": "pending",
+          "to": "inProgress"
+        },
+        {
+          "from": "held",
+          "to": "inProgress"
+        }
+      ]
+    },
+    "TMF653": {
+      "specRef": "TMF653",
+      "description": "Manages service test instances — scheduling, execution, and result retrieval.",
+      "entities": [
+        {
+          "name": "ServiceTest",
+          "mandatory": [
+            "id",
+            "state",
+            "serviceTestSpecification"
+          ],
+          "optional": [
+            "startDateTime",
+            "endDateTime",
+            "testMeasure",
+            "relatedService",
+            "place"
+          ]
+        }
+      ],
+      "lifecycle": [
+        "acknowledged",
+        "inProgress",
+        "completed",
+        "failed",
+        "cancelled"
+      ],
+      "terminal": [
+        "completed",
+        "failed",
+        "cancelled"
+      ],
+      "transitions": [
+        {
+          "from": "acknowledged",
+          "to": "inProgress"
+        },
+        {
+          "from": "acknowledged",
+          "to": "cancelled"
+        },
+        {
+          "from": "inProgress",
+          "to": "completed"
+        },
+        {
+          "from": "inProgress",
+          "to": "failed"
+        },
+        {
+          "from": "inProgress",
+          "to": "cancelled"
+        }
+      ]
+    },
+    "TMF621": {
+      "specRef": "TMF621",
+      "description": "Manages trouble tickets for tracking service issues raised by customers or network operations.",
+      "entities": [
+        {
+          "name": "TroubleTicket",
+          "mandatory": [
+            "id",
+            "name",
+            "severity",
+            "status"
+          ],
+          "optional": [
+            "requestedResolutionDate",
+            "resolutionDate",
+            "relatedEntity",
+            "relatedParty",
+            "note",
+            "channel"
+          ]
+        }
+      ],
+      "lifecycle": [
+        "acknowledged",
+        "inProgress",
+        "pending",
+        "held",
+        "resolved",
+        "closed",
+        "cancelled"
+      ],
+      "terminal": [
+        "closed",
+        "cancelled"
+      ],
+      "transitions": [
+        {
+          "from": "acknowledged",
+          "to": "inProgress"
+        },
+        {
+          "from": "acknowledged",
+          "to": "cancelled"
+        },
+        {
+          "from": "inProgress",
+          "to": "pending"
+        },
+        {
+          "from": "inProgress",
+          "to": "held"
+        },
+        {
+          "from": "inProgress",
+          "to": "resolved"
+        },
+        {
+          "from": "pending",
+          "to": "inProgress"
+        },
+        {
+          "from": "held",
+          "to": "inProgress"
+        },
+        {
+          "from": "resolved",
+          "to": "closed"
+        },
+        {
+          "from": "resolved",
+          "to": "inProgress"
+        }
+      ]
+    },
+    "TMF656": {
+      "specRef": "TMF656",
+      "description": "Manages service problems detected from network alarms or trouble tickets.",
+      "entities": [
+        {
+          "name": "ServiceProblem",
+          "mandatory": [
+            "id",
+            "status",
+            "priority",
+            "category"
+          ],
+          "optional": [
+            "affectedService",
+            "originatingSystem",
+            "relatedTroubleTicket",
+            "statusChangeDate",
+            "resolutionDate"
+          ]
+        }
+      ],
+      "lifecycle": [
+        "submitted",
+        "acknowledged",
+        "held",
+        "inProgress",
+        "resolved",
+        "closed"
+      ],
+      "terminal": [
+        "closed"
+      ],
+      "transitions": [
+        {
+          "from": "submitted",
+          "to": "acknowledged"
+        },
+        {
+          "from": "acknowledged",
+          "to": "held"
+        },
+        {
+          "from": "acknowledged",
+          "to": "inProgress"
+        },
+        {
+          "from": "held",
+          "to": "inProgress"
+        },
+        {
+          "from": "inProgress",
+          "to": "resolved"
+        },
+        {
+          "from": "inProgress",
+          "to": "held"
+        },
+        {
+          "from": "resolved",
+          "to": "closed"
+        },
+        {
+          "from": "resolved",
+          "to": "inProgress"
+        }
+      ]
+    },
+    "TMF688": {
+      "specRef": "TMF688 v4.0.0",
+      "description": "My api short documentation",
+      "entities": [
+        {
+          "name": "Characteristic",
+          "mandatory": [
+            "name",
+            "value"
+          ],
+          "optional": [
+            "id",
+            "valueType",
+            "characteristicRelationship",
+            "@baseType",
+            "@schemaLocation",
+            "@type"
+          ]
+        },
+        {
+          "name": "RelatedParty",
+          "mandatory": [
+            "id",
+            "@referredType"
+          ],
+          "optional": [
+            "href",
+            "name",
+            "role",
+            "@baseType",
+            "@schemaLocation",
+            "@type"
+          ]
+        },
+        {
+          "name": "Topic",
+          "mandatory": [],
+          "optional": [
+            "id",
+            "href",
+            "contentQuery",
+            "headerQuery",
+            "name",
+            "@baseType",
+            "@schemaLocation",
+            "@type"
+          ]
+        },
+        {
+          "name": "Error",
+          "mandatory": [
+            "code",
+            "reason"
+          ],
+          "optional": [
+            "message",
+            "status",
+            "referenceError",
+            "@baseType",
+            "@schemaLocation",
+            "@type"
+          ]
+        }
+      ],
+      "lifecycle": [],
+      "terminal": [],
+      "transitions": []
+    }
+  }
+}

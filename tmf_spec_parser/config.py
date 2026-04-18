@@ -5,17 +5,14 @@ Two categories:
   1. AUTO-DERIVED at parse time from OpenAPI specs (entities, lifecycle states,
      version, description).
   2. CURATED here because they cannot be reliably extracted from OpenAPI specs:
-       - SCHEMA_TO_API   : maps well-known cross-API $ref schema names → API id
-       - TRANSITIONS     : valid lifecycle state transitions (from CTK test cases
-                           and TMForum conformance documents)
-       - DOMAIN_MAP      : which domain each API belongs to
-       - TERMINAL_STATES : which states are end-states (no further transitions)
+       - SCHEMA_TO_API   : maps well-known cross-API $ref schema names to API id
+       - TRANSITIONS     : valid lifecycle state transitions (from CTK test cases)
+       - TERMINAL_STATES : which states are end-states
 """
 
 from __future__ import annotations
 
 # ── Supported API registry ─────────────────────────────────────────────────────
-# Each entry: (api_id, display_name, domain, short_name, github_repo_name)
 API_REGISTRY: list[dict] = [
     # Customer domain
     {
@@ -26,7 +23,7 @@ API_REGISTRY: list[dict] = [
     {
         "id": "TMF632", "name": "Party Management",
         "domain": "customer", "short": "Party Mgmt",
-        "repo": "TMF632_Party",
+        "repo": "TMF632_PartyManagement",
     },
     # Product domain
     {
@@ -37,7 +34,7 @@ API_REGISTRY: list[dict] = [
     {
         "id": "TMF622", "name": "Product Ordering",
         "domain": "product", "short": "Product Ordering",
-        "repo": "TMF622_ProductOrdering",
+        "repo": "TMF622_ProductOrder",
     },
     {
         "id": "TMF637", "name": "Product Inventory",
@@ -58,7 +55,7 @@ API_REGISTRY: list[dict] = [
     {
         "id": "TMF641", "name": "Service Ordering",
         "domain": "service", "short": "Service Ordering",
-        "repo": "TMF641_ServiceOrdering",
+        "repo": "TMF641_ServiceOrder",
     },
     {
         "id": "TMF645", "name": "Service Qualification",
@@ -79,7 +76,7 @@ API_REGISTRY: list[dict] = [
     {
         "id": "TMF652", "name": "Resource Ordering",
         "domain": "resource", "short": "Resource Ordering",
-        "repo": "TMF652_ResourceOrdering",
+        "repo": "TMF652_ResourceOrderManagement",
     },
     {
         "id": "TMF653", "name": "Service Test",
@@ -101,7 +98,7 @@ API_REGISTRY: list[dict] = [
     {
         "id": "TMF688", "name": "Event Management",
         "domain": "common", "short": "Event Mgmt",
-        "repo": "TMF688_Event",
+        "repo": "TMF688-Event",
     },
 ]
 
@@ -109,12 +106,12 @@ API_IDS: list[str] = [a["id"] for a in API_REGISTRY]
 
 # ── GitHub raw content base URL ───────────────────────────────────────────────
 GITHUB_ORG = "tmforum-apis"
-GITHUB_RAW_BASE = "https://raw.githubusercontent.com/{org}/{repo}/master/{filename}"
+GITHUB_RAW_BASE = (
+    "https://raw.githubusercontent.com/{org}/{repo}/master/{path}"
+)
 GITHUB_API_BASE = "https://api.github.com/repos/{org}/{repo}/contents/"
 
 # ── Cross-API schema → API mapping (curated) ─────────────────────────────────
-# When the extractor encounters a $ref schema name matching a key below, it
-# emits a directed edge: current_api → SCHEMA_TO_API[schema_name].
 SCHEMA_TO_API: dict[str, str] = {
     # Service domain
     "ServiceRef":                  "TMF638",
@@ -146,8 +143,6 @@ SCHEMA_TO_API: dict[str, str] = {
     "EventSubscriptionRef":        "TMF688",
 }
 
-# Relationship label for a given source schema name.
-# Falls back to "references {schema}" if not found.
 SCHEMA_TO_LABEL: dict[str, str] = {
     "ServiceRef":                  "creates Service",
     "ServiceSpecificationRef":     "uses ServiceSpec",
@@ -174,8 +169,6 @@ SCHEMA_TO_LABEL: dict[str, str] = {
 }
 
 # ── Curated lifecycle transitions (source: TMForum CTK + spec documents) ──────
-# These are deliberately NOT auto-extracted — the OpenAPI spec only lists valid
-# state values, not valid transitions between them.
 TRANSITIONS: dict[str, list[dict[str, str]]] = {
     "TMF641": [
         {"from": "acknowledged", "to": "inProgress"},
@@ -357,6 +350,7 @@ PATTERNS: list[dict] = [
 ]
 
 # ── State field names to scan for lifecycle enums ─────────────────────────────
+# Extended set — real TMForum specs use inconsistent field names.
 LIFECYCLE_FIELD_NAMES: set[str] = {
-    "state", "status", "lifecycleStatus", "resourceStatus",
+    "state", "status", "lifecycleStatus", "resourceStatus", "lifecycleState",
 }
