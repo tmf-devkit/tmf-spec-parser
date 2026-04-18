@@ -18,7 +18,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 
 class Severity(str, Enum):
@@ -29,15 +28,16 @@ class Severity(str, Enum):
 
 @dataclass
 class Finding:
-    api_id:      str
-    severity:    Severity
-    category:    str        # e.g. "FIELD_REMOVED", "STATE_CHANGED"
-    entity:      Optional[str]
-    message:     str
+    api_id:   str
+    severity: Severity
+    category: str
+    entity:   str | None
+    message:  str
 
     def __str__(self) -> str:
         entity_part = f" [{self.entity}]" if self.entity else ""
-        return f"[{self.severity.value}] {self.api_id}{entity_part} — {self.category}: {self.message}"
+        sev = self.severity.value
+        return f"[{sev}] {self.api_id}{entity_part} — {self.category}: {self.message}"
 
 
 @dataclass
@@ -84,7 +84,10 @@ class DiffReport:
             lines.append("")
             for finding in subset:
                 entity_part = f" `{finding.entity}`" if finding.entity else ""
-                lines.append(f"- **{finding.api_id}**{entity_part} — `{finding.category}`: {finding.message}")
+                lines.append(
+                    f"- **{finding.api_id}**{entity_part}"
+                    f" — `{finding.category}`: {finding.message}"
+                )
             lines.append("")
 
         return "\n".join(lines)
@@ -128,7 +131,10 @@ def diff(
             report.findings.append(Finding(
                 api_id=api_id, severity=Severity.WARNING,
                 category="API_NOT_FETCHED", entity=None,
-                message="API exists in tmf_data.json but was not fetched (check fetch errors)",
+                message=(
+                    "API exists in tmf_data.json but was not fetched"
+                    " (check fetch errors)"
+                ),
             ))
             continue
 
@@ -161,39 +167,37 @@ def diff(
             old_optional  = set(old_entity.get("optional",  []))
             new_optional  = set(new_entity.get("optional",  []))
 
-            # Mandatory field removed → breaking
-            for f in sorted(old_mandatory - new_mandatory):
+            for fname in sorted(old_mandatory - new_mandatory):
                 report.findings.append(Finding(
                     api_id=api_id, severity=Severity.ERROR,
                     category="MANDATORY_FIELD_REMOVED", entity=entity_name,
-                    message=f"Required field '{f}' was removed from spec",
+                    message=f"Required field '{fname}' was removed from spec",
                 ))
 
-            # New mandatory field → breaking for existing implementations
-            for f in sorted(new_mandatory - old_mandatory):
+            for fname in sorted(new_mandatory - old_mandatory):
                 report.findings.append(Finding(
                     api_id=api_id, severity=Severity.ERROR,
                     category="MANDATORY_FIELD_ADDED", entity=entity_name,
-                    message=f"New required field '{f}' added to spec — existing implementations may not supply it",
+                    message=(
+                        f"New required field '{fname}' added to spec"
+                        f" — existing implementations may not supply it"
+                    ),
                 ))
 
-            # Optional field added → informational
-            for f in sorted((new_optional - old_optional) - new_mandatory):
+            for fname in sorted((new_optional - old_optional) - new_mandatory):
                 report.findings.append(Finding(
                     api_id=api_id, severity=Severity.INFO,
                     category="OPTIONAL_FIELD_ADDED", entity=entity_name,
-                    message=f"New optional field '{f}' added",
+                    message=f"New optional field '{fname}' added",
                 ))
 
-            # Optional field removed → warning (consumers may depend on it)
-            for f in sorted((old_optional - new_optional) - old_mandatory):
+            for fname in sorted((old_optional - new_optional) - old_mandatory):
                 report.findings.append(Finding(
                     api_id=api_id, severity=Severity.WARNING,
                     category="OPTIONAL_FIELD_REMOVED", entity=entity_name,
-                    message=f"Optional field '{f}' removed from spec",
+                    message=f"Optional field '{fname}' removed from spec",
                 ))
 
-        # Entities that vanished entirely
         for entity_name in sorted(set(old_entities) - set(new_entities)):
             report.findings.append(Finding(
                 api_id=api_id, severity=Severity.ERROR,
@@ -209,14 +213,20 @@ def diff(
             report.findings.append(Finding(
                 api_id=api_id, severity=Severity.ERROR,
                 category="LIFECYCLE_STATE_REMOVED", entity=None,
-                message=f"Lifecycle state '{s}' removed from spec — breaks state machine consumers",
+                message=(
+                    f"Lifecycle state '{s}' removed from spec"
+                    f" — breaks state machine consumers"
+                ),
             ))
 
         for s in sorted(new_states - old_states):
             report.findings.append(Finding(
                 api_id=api_id, severity=Severity.WARNING,
                 category="LIFECYCLE_STATE_ADDED", entity=None,
-                message=f"New lifecycle state '{s}' in spec — update transitions table in config.py",
+                message=(
+                    f"New lifecycle state '{s}' in spec"
+                    f" — update transitions table in config.py"
+                ),
             ))
 
     return report

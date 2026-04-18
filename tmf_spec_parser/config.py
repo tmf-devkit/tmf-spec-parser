@@ -15,30 +15,94 @@ Two categories:
 from __future__ import annotations
 
 # ── Supported API registry ─────────────────────────────────────────────────────
-# Order here determines display order in emitted JSON.
+# Each entry: (api_id, display_name, domain, short_name, github_repo_name)
 API_REGISTRY: list[dict] = [
     # Customer domain
-    {"id": "TMF629", "name": "Customer Management",  "domain": "customer",   "short": "Customer Mgmt",   "repo": "TMF629_CustomerManagement"},
-    {"id": "TMF632", "name": "Party Management",      "domain": "customer",   "short": "Party Mgmt",      "repo": "TMF632_Party"},
+    {
+        "id": "TMF629", "name": "Customer Management",
+        "domain": "customer", "short": "Customer Mgmt",
+        "repo": "TMF629_CustomerManagement",
+    },
+    {
+        "id": "TMF632", "name": "Party Management",
+        "domain": "customer", "short": "Party Mgmt",
+        "repo": "TMF632_Party",
+    },
     # Product domain
-    {"id": "TMF620", "name": "Product Catalog",       "domain": "product",    "short": "Product Catalog", "repo": "TMF620_ProductCatalog"},
-    {"id": "TMF622", "name": "Product Ordering",      "domain": "product",    "short": "Product Ordering","repo": "TMF622_ProductOrdering"},
-    {"id": "TMF637", "name": "Product Inventory",     "domain": "product",    "short": "Product Inventory","repo": "TMF637_ProductInventory"},
+    {
+        "id": "TMF620", "name": "Product Catalog",
+        "domain": "product", "short": "Product Catalog",
+        "repo": "TMF620_ProductCatalog",
+    },
+    {
+        "id": "TMF622", "name": "Product Ordering",
+        "domain": "product", "short": "Product Ordering",
+        "repo": "TMF622_ProductOrdering",
+    },
+    {
+        "id": "TMF637", "name": "Product Inventory",
+        "domain": "product", "short": "Product Inventory",
+        "repo": "TMF637_ProductInventory",
+    },
     # Service domain
-    {"id": "TMF633", "name": "Service Catalog",       "domain": "service",    "short": "Service Catalog", "repo": "TMF633_ServiceCatalog"},
-    {"id": "TMF638", "name": "Service Inventory",     "domain": "service",    "short": "Service Inventory","repo": "TMF638_ServiceInventory"},
-    {"id": "TMF641", "name": "Service Ordering",      "domain": "service",    "short": "Service Ordering","repo": "TMF641_ServiceOrdering"},
-    {"id": "TMF645", "name": "Service Qualification", "domain": "service",    "short": "Service Qual",    "repo": "TMF645_ServiceQualification"},
+    {
+        "id": "TMF633", "name": "Service Catalog",
+        "domain": "service", "short": "Service Catalog",
+        "repo": "TMF633_ServiceCatalog",
+    },
+    {
+        "id": "TMF638", "name": "Service Inventory",
+        "domain": "service", "short": "Service Inventory",
+        "repo": "TMF638_ServiceInventory",
+    },
+    {
+        "id": "TMF641", "name": "Service Ordering",
+        "domain": "service", "short": "Service Ordering",
+        "repo": "TMF641_ServiceOrdering",
+    },
+    {
+        "id": "TMF645", "name": "Service Qualification",
+        "domain": "service", "short": "Service Qual",
+        "repo": "TMF645_ServiceQualification",
+    },
     # Resource domain
-    {"id": "TMF634", "name": "Resource Catalog",      "domain": "resource",   "short": "Resource Catalog","repo": "TMF634_ResourceCatalog"},
-    {"id": "TMF639", "name": "Resource Inventory",    "domain": "resource",   "short": "Resource Inventory","repo": "TMF639_ResourceInventory"},
-    {"id": "TMF652", "name": "Resource Ordering",     "domain": "resource",   "short": "Resource Ordering","repo": "TMF652_ResourceOrdering"},
-    {"id": "TMF653", "name": "Service Test",          "domain": "resource",   "short": "Service Test",    "repo": "TMF653_ServiceTestManagement"},
+    {
+        "id": "TMF634", "name": "Resource Catalog",
+        "domain": "resource", "short": "Resource Catalog",
+        "repo": "TMF634_ResourceCatalog",
+    },
+    {
+        "id": "TMF639", "name": "Resource Inventory",
+        "domain": "resource", "short": "Resource Inventory",
+        "repo": "TMF639_ResourceInventory",
+    },
+    {
+        "id": "TMF652", "name": "Resource Ordering",
+        "domain": "resource", "short": "Resource Ordering",
+        "repo": "TMF652_ResourceOrdering",
+    },
+    {
+        "id": "TMF653", "name": "Service Test",
+        "domain": "resource", "short": "Service Test",
+        "repo": "TMF653_ServiceTestManagement",
+    },
     # Engagement domain
-    {"id": "TMF621", "name": "Trouble Ticket",        "domain": "engagement", "short": "Trouble Ticket",  "repo": "TMF621_TroubleTicket"},
-    {"id": "TMF656", "name": "Service Problem",       "domain": "engagement", "short": "Service Problem", "repo": "TMF656_ServiceProblemManagement"},
+    {
+        "id": "TMF621", "name": "Trouble Ticket",
+        "domain": "engagement", "short": "Trouble Ticket",
+        "repo": "TMF621_TroubleTicket",
+    },
+    {
+        "id": "TMF656", "name": "Service Problem",
+        "domain": "engagement", "short": "Service Problem",
+        "repo": "TMF656_ServiceProblemManagement",
+    },
     # Common
-    {"id": "TMF688", "name": "Event Management",      "domain": "common",     "short": "Event Mgmt",      "repo": "TMF688_Event"},
+    {
+        "id": "TMF688", "name": "Event Management",
+        "domain": "common", "short": "Event Mgmt",
+        "repo": "TMF688_Event",
+    },
 ]
 
 API_IDS: list[str] = [a["id"] for a in API_REGISTRY]
@@ -51,69 +115,67 @@ GITHUB_API_BASE = "https://api.github.com/repos/{org}/{repo}/contents/"
 # ── Cross-API schema → API mapping (curated) ─────────────────────────────────
 # When the extractor encounters a $ref schema name matching a key below, it
 # emits a directed edge: current_api → SCHEMA_TO_API[schema_name].
-# Keys are schema name substrings (checked with str.startswith for Ref variants).
 SCHEMA_TO_API: dict[str, str] = {
     # Service domain
-    "ServiceRef":                    "TMF638",
-    "ServiceSpecificationRef":       "TMF633",
-    "ServiceOrderRef":               "TMF641",
-    "ServiceQualificationRef":       "TMF645",
-    "ServiceTestRef":                "TMF653",
-    "ServiceTestSpecificationRef":   "TMF653",
+    "ServiceRef":                  "TMF638",
+    "ServiceSpecificationRef":     "TMF633",
+    "ServiceOrderRef":             "TMF641",
+    "ServiceQualificationRef":     "TMF645",
+    "ServiceTestRef":              "TMF653",
+    "ServiceTestSpecificationRef": "TMF653",
     # Resource domain
-    "ResourceRef":                   "TMF639",
-    "ResourceSpecificationRef":      "TMF634",
-    "ResourceOrderRef":              "TMF652",
+    "ResourceRef":                 "TMF639",
+    "ResourceSpecificationRef":    "TMF634",
+    "ResourceOrderRef":            "TMF652",
     # Product domain
-    "ProductOfferingRef":            "TMF620",
-    "ProductSpecificationRef":       "TMF620",
-    "ProductOrderRef":               "TMF622",
-    "ProductRef":                    "TMF637",
+    "ProductOfferingRef":          "TMF620",
+    "ProductSpecificationRef":     "TMF620",
+    "ProductOrderRef":             "TMF622",
+    "ProductRef":                  "TMF637",
     # Customer / Party domain
-    "CustomerRef":                   "TMF629",
-    "PartyRef":                      "TMF632",
-    "PartyRoleRef":                  "TMF632",
-    "IndividualRef":                 "TMF632",
-    "OrganizationRef":               "TMF632",
-    "RelatedParty":                  "TMF632",
+    "CustomerRef":                 "TMF629",
+    "PartyRef":                    "TMF632",
+    "PartyRoleRef":                "TMF632",
+    "IndividualRef":               "TMF632",
+    "OrganizationRef":             "TMF632",
+    "RelatedParty":                "TMF632",
     # Engagement
-    "TroubleTicketRef":              "TMF621",
-    "ServiceProblemRef":             "TMF656",
+    "TroubleTicketRef":            "TMF621",
+    "ServiceProblemRef":           "TMF656",
     # Events / common
-    "EventSubscriptionRef":          "TMF688",
+    "EventSubscriptionRef":        "TMF688",
 }
 
-# Relationship label for a given source schema name (human-readable edge label).
+# Relationship label for a given source schema name.
 # Falls back to "references {schema}" if not found.
 SCHEMA_TO_LABEL: dict[str, str] = {
-    "ServiceRef":                    "creates Service",
-    "ServiceSpecificationRef":       "uses ServiceSpec",
-    "ServiceOrderRef":               "triggers ServiceOrder",
-    "ServiceQualificationRef":       "checks ServiceQual",
-    "ServiceTestRef":                "tests Service",
-    "ServiceTestSpecificationRef":   "uses ServiceTestSpec",
-    "ResourceRef":                   "references Resource",
-    "ResourceSpecificationRef":      "uses ResourceSpec",
-    "ResourceOrderRef":              "creates ResourceOrder",
-    "ProductOfferingRef":            "uses ProductOffering",
-    "ProductSpecificationRef":       "uses ProductSpec",
-    "ProductOrderRef":               "triggers ProductOrder",
-    "ProductRef":                    "references Product",
-    "CustomerRef":                   "for Customer",
-    "PartyRef":                      "extends Party",
-    "PartyRoleRef":                  "uses PartyRole",
-    "IndividualRef":                 "references Individual",
-    "OrganizationRef":               "references Organization",
-    "RelatedParty":                  "has RelatedParty",
-    "TroubleTicketRef":              "has TroubleTicket",
-    "ServiceProblemRef":             "affects ServiceProblem",
-    "EventSubscriptionRef":          "uses EventSubscription",
+    "ServiceRef":                  "creates Service",
+    "ServiceSpecificationRef":     "uses ServiceSpec",
+    "ServiceOrderRef":             "triggers ServiceOrder",
+    "ServiceQualificationRef":     "checks ServiceQual",
+    "ServiceTestRef":              "tests Service",
+    "ServiceTestSpecificationRef": "uses ServiceTestSpec",
+    "ResourceRef":                 "references Resource",
+    "ResourceSpecificationRef":    "uses ResourceSpec",
+    "ResourceOrderRef":            "creates ResourceOrder",
+    "ProductOfferingRef":          "uses ProductOffering",
+    "ProductSpecificationRef":     "uses ProductSpec",
+    "ProductOrderRef":             "triggers ProductOrder",
+    "ProductRef":                  "references Product",
+    "CustomerRef":                 "for Customer",
+    "PartyRef":                    "extends Party",
+    "PartyRoleRef":                "uses PartyRole",
+    "IndividualRef":               "references Individual",
+    "OrganizationRef":             "references Organization",
+    "RelatedParty":                "has RelatedParty",
+    "TroubleTicketRef":            "has TroubleTicket",
+    "ServiceProblemRef":           "affects ServiceProblem",
+    "EventSubscriptionRef":        "uses EventSubscription",
 }
 
 # ── Curated lifecycle transitions (source: TMForum CTK + spec documents) ──────
 # These are deliberately NOT auto-extracted — the OpenAPI spec only lists valid
-# state values, not valid transitions between them.  Transitions come from the
-# Conformance Test Kit (CTK) test cases and the API user guides.
+# state values, not valid transitions between them.
 TRANSITIONS: dict[str, list[dict[str, str]]] = {
     "TMF641": [
         {"from": "acknowledged", "to": "inProgress"},
@@ -295,5 +357,6 @@ PATTERNS: list[dict] = [
 ]
 
 # ── State field names to scan for lifecycle enums ─────────────────────────────
-# Some APIs use "state", others "status", others "lifecycleStatus".
-LIFECYCLE_FIELD_NAMES: set[str] = {"state", "status", "lifecycleStatus", "resourceStatus"}
+LIFECYCLE_FIELD_NAMES: set[str] = {
+    "state", "status", "lifecycleStatus", "resourceStatus",
+}

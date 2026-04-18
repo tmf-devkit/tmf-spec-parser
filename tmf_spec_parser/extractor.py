@@ -16,7 +16,7 @@ What we deliberately do NOT auto-extract (stays in config.py):
 from __future__ import annotations
 
 import re
-from typing import Any, Optional
+from typing import Any
 
 from tmf_spec_parser.config import (
     LIFECYCLE_FIELD_NAMES,
@@ -43,7 +43,7 @@ def _resolve_ref(ref: str) -> str:
 def _walk_schema(
     schema: dict,
     schemas: dict[str, dict],
-    visited: Optional[set[str]] = None,
+    visited: set[str] | None = None,
 ) -> dict[str, Any]:
     """
     Recursively resolve $ref and allOf/anyOf chains.
@@ -105,7 +105,6 @@ def _is_root_entity(name: str, schema: dict) -> bool:
     """
     if name.endswith(("Ref", "Type", "Enum", "FVO", "MVO", "Create", "Update")):
         return False
-    # Must have properties (directly or via allOf)
     has_props = bool(schema.get("properties")) or bool(schema.get("allOf"))
     return has_props
 
@@ -116,11 +115,9 @@ def _extract_mandatory_optional(
 ) -> tuple[list[str], list[str]]:
     """Return (mandatory_fields, optional_fields) for a schema."""
     all_props  = _walk_schema(schema, schemas)
-    # required can be at the schema level or inside allOf fragments
     required: set[str] = set(schema.get("required", []))
     for sub in schema.get("allOf", []):
         required.update(sub.get("required", []))
-        # Also check referenced schema's required
         if "$ref" in sub:
             ref_name = _resolve_ref(sub["$ref"])
             if ref_name in schemas:
@@ -128,7 +125,6 @@ def _extract_mandatory_optional(
 
     mandatory = [p for p in all_props if p in required]
     optional  = [p for p in all_props if p not in required]
-    # Cap optional at 12 to keep the UI manageable
     return mandatory, optional[:12]
 
 
@@ -173,10 +169,8 @@ def _spec_version(spec: dict) -> str:
 def _spec_description(spec: dict) -> str:
     """First sentence of info.description, cleaned up."""
     raw = spec.get("info", {}).get("description", "")
-    # Strip markdown headers, newlines
     raw = re.sub(r"#+\s*", "", raw)
     raw = raw.replace("\n", " ").strip()
-    # First sentence only
     match = re.match(r"([^.!?]+[.!?])", raw)
     return match.group(1).strip() if match else raw[:200]
 
@@ -207,7 +201,6 @@ def extract(api_id: str, spec: dict) -> dict:
         if not _is_root_entity(name, schema):
             continue
         mandatory, optional = _extract_mandatory_optional(schema, schemas)
-        # Only include entities that have at least one field
         if not mandatory and not optional:
             continue
         entities.append({
@@ -216,23 +209,19 @@ def extract(api_id: str, spec: dict) -> dict:
             "optional":  optional,
         })
 
-    # Limit to the 4 most "substantial" entities (most total fields) so the UI
-    # doesn't get flooded with internal helper types.
     entities.sort(key=lambda e: len(e["mandatory"]) + len(e["optional"]), reverse=True)
     entities = entities[:4]
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
     lifecycle: list[str] = []
-    # Try root-level entities first (order matters for state machine layout)
     for entity in entities:
         schema = schemas.get(entity["name"], {})
         states = _extract_lifecycle_from_schema(schema, schemas)
         if states:
             lifecycle = states
             break
-    # Fallback: scan all schemas
     if not lifecycle:
-        for name, schema in schemas.items():
+        for _name, schema in schemas.items():
             states = _extract_lifecycle_from_schema(schema, schemas)
             if states:
                 lifecycle = states

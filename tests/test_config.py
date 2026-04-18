@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from tmf_spec_parser.config import (
     API_IDS,
     API_REGISTRY,
@@ -35,11 +33,10 @@ def test_all_apis_have_terminal_states():
 
 
 def test_terminal_states_are_subsets_of_lifecycle():
-    """Every terminal state must appear in the TRANSITIONS keys or lifecycle somewhere.
-    At minimum: terminal states should be valid state strings (non-empty)."""
     for api_id, terminal in TERMINAL_STATES.items():
         for state in terminal:
-            assert isinstance(state, str) and state, f"Invalid terminal state in {api_id}: {state!r}"
+            msg = f"Invalid terminal state in {api_id}: {state!r}"
+            assert isinstance(state, str) and state, msg
 
 
 def test_transitions_have_from_and_to():
@@ -56,7 +53,8 @@ def test_transitions_no_self_loops():
 
 def test_schema_to_api_values_are_valid_ids():
     for schema, api_id in SCHEMA_TO_API.items():
-        assert api_id in API_IDS, f"SCHEMA_TO_API[{schema!r}] = {api_id!r} is not a valid API ID"
+        msg = f"SCHEMA_TO_API[{schema!r}] = {api_id!r} is not a valid API ID"
+        assert api_id in API_IDS, msg
 
 
 def test_patterns_structure():
@@ -75,4 +73,5 @@ def test_no_duplicate_api_ids():
 def test_domains_are_known():
     valid_domains = {"customer", "product", "service", "resource", "engagement", "common"}
     for entry in API_REGISTRY:
-        assert entry["domain"] in valid_domains, f"Unknown domain: {entry['domain']} in {entry['id']}"
+        msg = f"Unknown domain: {entry['domain']} in {entry['id']}"
+        assert entry["domain"] in valid_domains, msg

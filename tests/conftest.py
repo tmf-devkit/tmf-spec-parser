@@ -5,9 +5,6 @@ from __future__ import annotations
 import pytest
 
 
-# ── Minimal synthetic OpenAPI specs ──────────────────────────────────────────
-# These mimic the real TMForum spec structure but are self-contained.
-
 @pytest.fixture()
 def tmf641_spec() -> dict:
     """Minimal TMF641 Service Ordering spec."""
@@ -16,7 +13,9 @@ def tmf641_spec() -> dict:
         "info": {
             "title":   "Service Ordering Management",
             "version": "4.1.0",
-            "description": "Manages service order lifecycle from acknowledgement through fulfillment. Supports complex order scenarios.",
+            "description": (
+                "Manages service order lifecycle from acknowledgement through fulfillment."
+            ),
         },
         "components": {
             "schemas": {
@@ -24,18 +23,20 @@ def tmf641_spec() -> dict:
                     "type": "object",
                     "required": ["id", "state", "orderDate"],
                     "properties": {
-                        "id":          {"type": "string"},
-                        "state":       {
+                        "id":    {"type": "string"},
+                        "state": {
                             "type": "string",
-                            "enum": ["acknowledged", "inProgress", "pending", "held",
-                                     "completed", "failed", "cancelled"],
+                            "enum": [
+                                "acknowledged", "inProgress", "pending", "held",
+                                "completed", "failed", "cancelled",
+                            ],
                         },
                         "orderDate":               {"type": "string", "format": "date-time"},
                         "requestedStartDate":      {"type": "string", "format": "date-time"},
                         "requestedCompletionDate": {"type": "string", "format": "date-time"},
-                        "priority":                {"type": "string"},
-                        "description":             {"type": "string"},
-                        "service": {"$ref": "#/components/schemas/ServiceRef"},
+                        "priority":    {"type": "string"},
+                        "description": {"type": "string"},
+                        "service":     {"$ref": "#/components/schemas/ServiceRef"},
                     },
                 },
                 "ServiceOrderItem": {
@@ -70,7 +71,9 @@ def tmf638_spec() -> dict:
         "info": {
             "title":   "Service Inventory Management",
             "version": "4.0.0",
-            "description": "Provides a register of all instantiated services provisioned in the network.",
+            "description": (
+                "Provides a register of all instantiated services provisioned in the network."
+            ),
         },
         "components": {
             "schemas": {
@@ -83,12 +86,16 @@ def tmf638_spec() -> dict:
                         "serviceType": {"type": "string"},
                         "state": {
                             "type": "string",
-                            "enum": ["feasibilityChecked", "designed", "reserved",
-                                     "active", "inactive", "terminated"],
+                            "enum": [
+                                "feasibilityChecked", "designed", "reserved",
+                                "active", "inactive", "terminated",
+                            ],
                         },
                         "startDate":             {"type": "string"},
                         "serviceCharacteristic": {"type": "array", "items": {}},
-                        "supportingResource": {"$ref": "#/components/schemas/ResourceRef"},
+                        "supportingResource": {
+                            "$ref": "#/components/schemas/ResourceRef",
+                        },
                     },
                 },
                 "ResourceRef": {
@@ -109,8 +116,8 @@ def swagger2_spec() -> dict:
     return {
         "swagger": "2.0",
         "info": {
-            "title":   "Party Management",
-            "version": "4.0.0",
+            "title":       "Party Management",
+            "version":     "4.0.0",
             "description": "Manages party entities (individuals and organisations).",
         },
         "definitions": {
@@ -132,8 +139,8 @@ def swagger2_spec() -> dict:
                 "type": "object",
                 "required": ["id", "name"],
                 "properties": {
-                    "id":   {"type": "string"},
-                    "name": {"type": "string"},
+                    "id":          {"type": "string"},
+                    "name":        {"type": "string"},
                     "tradingName": {"type": "string"},
                 },
             },

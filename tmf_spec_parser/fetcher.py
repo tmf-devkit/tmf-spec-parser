@@ -17,7 +17,6 @@ import os
 import re
 import time
 from pathlib import Path
-from typing import Optional
 
 import httpx
 
@@ -30,18 +29,6 @@ from tmf_spec_parser.config import (
 
 # Default cache directory: ~/.tmf-spec-parser/cache/
 DEFAULT_CACHE_DIR = Path.home() / ".tmf-spec-parser" / "cache"
-
-# Candidate OpenAPI filenames — tried in order for each repo.
-# TMForum repos are inconsistent; newer ones use swagger.json, some use openapi.yaml.
-FILENAME_CANDIDATES = [
-    "{api_id}-{name_lower}-v{major}.{minor}.0.swagger.json",
-    "{api_id}-{name_lower}-v{major}.{minor}.0.oas.yaml",
-    "{api_id}_{name_title}.swagger.json",
-    "{api_id}.swagger.json",
-    "swagger.json",
-    "openapi.json",
-    "openapi.yaml",
-]
 
 
 class FetchError(Exception):
@@ -69,9 +56,8 @@ def _list_repo_files(repo: str, client: httpx.Client) -> list[str]:
     return [item["name"] for item in resp.json() if item["type"] == "file"]
 
 
-def _infer_filename(repo_files: list[str]) -> Optional[str]:
+def _infer_filename(repo_files: list[str]) -> str | None:
     """Pick the best OpenAPI spec file from a list of repo filenames."""
-    # Prefer swagger.json, then openapi.json, then yaml
     for priority in (".swagger.json", ".oas.json", "openapi.json", "openapi.yaml", "swagger.json"):
         for name in repo_files:
             if name.lower().endswith(priority.lower()):
@@ -87,7 +73,7 @@ def fetch_spec(
     api_entry: dict,
     cache_dir: Path = DEFAULT_CACHE_DIR,
     refresh: bool = False,
-    client: Optional[httpx.Client] = None,
+    client: httpx.Client | None = None,
     delay: float = 0.25,
 ) -> dict:
     """
@@ -150,11 +136,7 @@ def _fetch_from_github(
                 return _parse_response(resp, api_id, url)
 
     # Strategy 2: try a short list of well-known filenames directly
-    for candidate in [
-        f"{api_id}.swagger.json",
-        "swagger.json",
-        "openapi.json",
-    ]:
+    for candidate in [f"{api_id}.swagger.json", "swagger.json", "openapi.json"]:
         url = _raw_url(repo, candidate)
         resp = client.get(url, headers=_github_headers(), timeout=30, follow_redirects=True)
         time.sleep(delay)
@@ -202,7 +184,7 @@ def _parse_response(resp: httpx.Response, api_id: str, url: str) -> dict:
 
 
 def fetch_all(
-    apis: Optional[list[str]] = None,
+    apis: list[str] | None = None,
     cache_dir: Path = DEFAULT_CACHE_DIR,
     refresh: bool = False,
     delay: float = 0.25,
@@ -238,10 +220,11 @@ def fetch_all(
                 errors[api_id] = str(exc)
 
     if errors:
-        # Surface as a warning rather than hard failure so partial results
-        # are still usable.
         import warnings
         for api_id, msg in errors.items():
-            warnings.warn(f"[tmf-spec-parser] fetch failed for {api_id}: {msg}", stacklevel=2)
+            warnings.warn(
+                f"[tmf-spec-parser] fetch failed for {api_id}: {msg}",
+                stacklevel=2,
+            )
 
     return results

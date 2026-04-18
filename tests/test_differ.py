@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import pytest
-
 from tmf_spec_parser.differ import DiffReport, Finding, Severity, diff
-
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -16,10 +13,15 @@ def _make_existing(
     lifecycle: list[str] | None = None,
     spec_ref:  str = "TMF641 v4.1.0",
 ) -> dict:
+    entity = {
+        "name":      "ServiceOrder",
+        "mandatory": mandatory or ["id", "state"],
+        "optional":  optional or ["priority"],
+    }
     return {
         api_id: {
-            "specRef":  spec_ref,
-            "entities": [{"name": "ServiceOrder", "mandatory": mandatory or ["id", "state"], "optional": optional or ["priority"]}],
+            "specRef":   spec_ref,
+            "entities":  [entity],
             "lifecycle": lifecycle or ["acknowledged", "inProgress", "completed"],
         }
     }
@@ -32,12 +34,17 @@ def _make_extracted(
     lifecycle: list[str] | None = None,
     version:   str = "4.1.0",
 ) -> dict:
+    entity = {
+        "name":      "ServiceOrder",
+        "mandatory": mandatory or ["id", "state"],
+        "optional":  optional or ["priority"],
+    }
     return {
         api_id: {
-            "version":  version,
-            "entities": [{"name": "ServiceOrder", "mandatory": mandatory or ["id", "state"], "optional": optional or ["priority"]}],
+            "version":   version,
+            "entities":  [entity],
             "lifecycle": lifecycle or ["acknowledged", "inProgress", "completed"],
-            "links": [],
+            "links":     [],
         }
     }
 
@@ -82,7 +89,11 @@ def test_diff_report_to_markdown_no_findings():
 
 def test_diff_report_to_markdown_with_findings():
     report = DiffReport(findings=[
-        Finding("TMF641", Severity.ERROR, "MANDATORY_FIELD_REMOVED", "ServiceOrder", "field 'state' removed"),
+        Finding(
+            "TMF641", Severity.ERROR,
+            "MANDATORY_FIELD_REMOVED", "ServiceOrder",
+            "field 'state' removed",
+        ),
     ])
     md = report.to_markdown()
     assert "TMF641" in md
@@ -96,14 +107,13 @@ def test_no_diff_when_identical():
     existing  = _make_existing()
     extracted = _make_extracted()
     report = diff(existing, extracted)
-    # Only possible finding is VERSION_CHANGED (same version → none)
     non_version = [f for f in report.findings if f.category != "VERSION_CHANGED"]
     assert non_version == []
 
 
 def test_mandatory_field_removed_is_error():
     existing  = _make_existing(mandatory=["id", "state", "orderDate"])
-    extracted = _make_extracted(mandatory=["id", "state"])  # orderDate removed
+    extracted = _make_extracted(mandatory=["id", "state"])
     report = diff(existing, extracted)
     cats = [f.category for f in report.findings]
     assert "MANDATORY_FIELD_REMOVED" in cats
@@ -115,16 +125,17 @@ def test_new_mandatory_field_is_error():
     existing  = _make_existing(mandatory=["id", "state"])
     extracted = _make_extracted(mandatory=["id", "state", "newRequiredField"])
     report = diff(existing, extracted)
-    cats = [f.category for f in report.findings]
-    assert "MANDATORY_FIELD_ADDED" in cats
+    assert "MANDATORY_FIELD_ADDED" in [f.category for f in report.findings]
 
 
 def test_optional_field_removed_is_warning():
     existing  = _make_existing(optional=["priority", "description"])
-    extracted = _make_extracted(optional=["priority"])  # description removed
+    extracted = _make_extracted(optional=["priority"])
     report = diff(existing, extracted)
-    warnings = [f for f in report.findings if f.severity == Severity.WARNING
-                and f.category == "OPTIONAL_FIELD_REMOVED"]
+    warnings = [
+        f for f in report.findings
+        if f.severity == Severity.WARNING and f.category == "OPTIONAL_FIELD_REMOVED"
+    ]
     assert any("description" in f.message for f in warnings)
 
 
@@ -132,14 +143,16 @@ def test_optional_field_added_is_info():
     existing  = _make_existing(optional=["priority"])
     extracted = _make_extracted(optional=["priority", "newOptionalField"])
     report = diff(existing, extracted)
-    infos = [f for f in report.findings if f.severity == Severity.INFO
-             and f.category == "OPTIONAL_FIELD_ADDED"]
+    infos = [
+        f for f in report.findings
+        if f.severity == Severity.INFO and f.category == "OPTIONAL_FIELD_ADDED"
+    ]
     assert any("newOptionalField" in f.message for f in infos)
 
 
 def test_lifecycle_state_removed_is_error():
     existing  = _make_existing(lifecycle=["acknowledged", "inProgress", "completed"])
-    extracted = _make_extracted(lifecycle=["acknowledged", "completed"])  # inProgress removed
+    extracted = _make_extracted(lifecycle=["acknowledged", "completed"])
     report = diff(existing, extracted)
     errors = [f for f in report.findings if f.category == "LIFECYCLE_STATE_REMOVED"]
     assert any("inProgress" in f.message for f in errors)
@@ -163,18 +176,16 @@ def test_version_change_is_info():
 
 def test_api_not_fetched_is_warning():
     existing  = _make_existing("TMF641")
-    extracted = {}  # TMF641 not in extracted
+    extracted = {}
     report = diff(existing, extracted)
-    cats = [f.category for f in report.findings]
-    assert "API_NOT_FETCHED" in cats
+    assert "API_NOT_FETCHED" in [f.category for f in report.findings]
 
 
 def test_new_api_in_extracted_is_info():
     existing  = {}
     extracted = _make_extracted("TMF999")
     report = diff(existing, extracted)
-    cats = [f.category for f in report.findings]
-    assert "API_ADDED" in cats
+    assert "API_ADDED" in [f.category for f in report.findings]
 
 
 def test_entity_removed_is_error():
@@ -197,8 +208,7 @@ def test_entity_removed_is_error():
         }
     }
     report = diff(existing, extracted)
-    cats = [f.category for f in report.findings]
-    assert "ENTITY_REMOVED" in cats
+    assert "ENTITY_REMOVED" in [f.category for f in report.findings]
 
 
 def test_multiple_apis_diffed():
@@ -208,8 +218,7 @@ def test_multiple_apis_diffed():
     }
     extracted = {
         "TMF641": _make_extracted("TMF641")["TMF641"],
-        "TMF638": _make_extracted("TMF638", mandatory=["id", "name"])["TMF638"],  # state removed
+        "TMF638": _make_extracted("TMF638", mandatory=["id", "name"])["TMF638"],
     }
     report = diff(existing, extracted)
-    api_ids = {f.api_id for f in report.findings}
-    assert "TMF638" in api_ids
+    assert "TMF638" in {f.api_id for f in report.findings}

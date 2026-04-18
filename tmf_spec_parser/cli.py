@@ -29,14 +29,19 @@ import click
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
-from rich import print as rprint
 
 from tmf_spec_parser import __version__
 from tmf_spec_parser.config import API_IDS, API_REGISTRY
-from tmf_spec_parser.fetcher import DEFAULT_CACHE_DIR, fetch_all
-from tmf_spec_parser.extractor import extract_all
-from tmf_spec_parser.emitter import build, load_existing, write_json, write_js_module, write_ts_module
 from tmf_spec_parser.differ import diff
+from tmf_spec_parser.emitter import (
+    build,
+    load_existing,
+    write_js_module,
+    write_json,
+    write_ts_module,
+)
+from tmf_spec_parser.extractor import extract_all
+from tmf_spec_parser.fetcher import DEFAULT_CACHE_DIR, fetch_all
 
 console = Console()
 
@@ -60,30 +65,18 @@ def main() -> None:
     "--out", "-o", default=str(DEFAULT_OUTPUT), show_default=True,
     help="Output path for tmf_data.json.",
 )
-@click.option(
-    "--js", is_flag=True, default=False,
-    help="Also emit a tmf_data.js ES module alongside the JSON.",
-)
-@click.option(
-    "--ts", is_flag=True, default=False,
-    help="Also emit a tmf_data.ts TypeScript module.",
-)
-@click.option(
-    "--refresh", "-r", is_flag=True, default=False,
-    help="Bypass local cache and re-download all specs from GitHub.",
-)
-@click.option(
-    "--cache-dir", default=str(DEFAULT_CACHE_DIR), show_default=True,
-    help="Directory for cached spec files.",
-)
-@click.option(
-    "--no-diff", is_flag=True, default=False,
-    help="Skip the diff check against the existing output file.",
-)
-@click.option(
-    "--diff-out", default="SPEC_CHANGES.md", show_default=True,
-    help="Path to write the diff report (Markdown). Only written when changes exist.",
-)
+@click.option("--js", is_flag=True, default=False,
+              help="Also emit a tmf_data.js ES module alongside the JSON.")
+@click.option("--ts", is_flag=True, default=False,
+              help="Also emit a tmf_data.ts TypeScript module.")
+@click.option("--refresh", "-r", is_flag=True, default=False,
+              help="Bypass local cache and re-download all specs from GitHub.")
+@click.option("--cache-dir", default=str(DEFAULT_CACHE_DIR), show_default=True,
+              help="Directory for cached spec files.")
+@click.option("--no-diff", is_flag=True, default=False,
+              help="Skip the diff check against the existing output file.")
+@click.option("--diff-out", default="SPEC_CHANGES.md", show_default=True,
+              help="Path to write the diff report (Markdown).")
 def generate(
     apis: str | None,
     out: str,
@@ -124,7 +117,10 @@ def generate(
         sys.exit(1)
 
     fetched_ids = sorted(specs)
-    console.print(f"[green]✓[/green] Fetched {len(fetched_ids)} spec(s): {', '.join(fetched_ids)}")
+    console.print(
+        f"[green]✓[/green] Fetched {len(fetched_ids)} spec(s):"
+        f" {', '.join(fetched_ids)}"
+    )
 
     # ── 2. Extract ────────────────────────────────────────────────────────────
     with console.status("[cyan]Extracting metadata…"):
@@ -138,17 +134,26 @@ def generate(
         if existing:
             report = diff(existing.get("details", {}), extracted)
             if report.findings:
-                console.print(f"\n[yellow]Diff against existing {output_path}:[/yellow]")
+                console.print(
+                    f"\n[yellow]Diff against existing {output_path}:[/yellow]"
+                )
                 for finding in report.findings:
-                    colour = {"ERROR": "red", "WARNING": "yellow", "INFO": "blue"}[finding.severity.value]
+                    colour = {
+                        "ERROR": "red", "WARNING": "yellow", "INFO": "blue",
+                    }[finding.severity.value]
                     console.print(f"  [{colour}]{finding}[/{colour}]")
                 diff_path = Path(diff_out)
                 diff_path.write_text(report.to_markdown(), encoding="utf-8")
                 console.print(f"\n[yellow]Diff report written to {diff_path}[/yellow]")
                 if report.has_breaking_changes:
-                    console.print("[red bold]⚠ Breaking changes detected — review before deploying.[/red bold]")
+                    console.print(
+                        "[red bold]⚠ Breaking changes detected"
+                        " — review before deploying.[/red bold]"
+                    )
             else:
-                console.print("[green]✓[/green] No differences detected — specs are in sync.")
+                console.print(
+                    "[green]✓[/green] No differences detected — specs are in sync."
+                )
 
     # ── 4. Build & write ──────────────────────────────────────────────────────
     data = build(extracted)
@@ -165,30 +170,24 @@ def generate(
         write_ts_module(data, ts_path)
         console.print(f"[green]✓[/green] Written: {ts_path}")
 
-    console.print(f"\n[bold green]Done.[/bold green] {len(data['links'])} cross-API links, {len(data['apis'])} APIs in output.")
+    console.print(
+        f"\n[bold green]Done.[/bold green]"
+        f" {len(data['links'])} cross-API links,"
+        f" {len(data['apis'])} APIs in output."
+    )
 
 
 # ── diff ───────────────────────────────────────────────────────────────────────
 @main.command(name="diff")
-@click.option(
-    "--existing", "-e", default=str(DEFAULT_OUTPUT), show_default=True,
-    help="Path to existing tmf_data.json to compare against.",
-)
-@click.option(
-    "--apis", "-a", default=None,
-    help="Comma-separated API IDs to check. Defaults to all.",
-)
-@click.option(
-    "--refresh", "-r", is_flag=True, default=False,
-    help="Re-download specs before diffing.",
-)
-@click.option(
-    "--cache-dir", default=str(DEFAULT_CACHE_DIR), show_default=True,
-)
-@click.option(
-    "--out", "-o", default=None,
-    help="Write Markdown report to this file.",
-)
+@click.option("--existing", "-e", default=str(DEFAULT_OUTPUT), show_default=True,
+              help="Path to existing tmf_data.json to compare against.")
+@click.option("--apis", "-a", default=None,
+              help="Comma-separated API IDs to check. Defaults to all.")
+@click.option("--refresh", "-r", is_flag=True, default=False,
+              help="Re-download specs before diffing.")
+@click.option("--cache-dir", default=str(DEFAULT_CACHE_DIR), show_default=True)
+@click.option("--out", "-o", default=None,
+              help="Write Markdown report to this file.")
 def diff_cmd(
     existing: str,
     apis: str | None,
@@ -220,7 +219,9 @@ def diff_cmd(
 
     console.print(f"\n[bold]Diff report — {report.summary()}[/bold]\n")
     for finding in report.findings:
-        colour = {"ERROR": "red", "WARNING": "yellow", "INFO": "blue"}[finding.severity.value]
+        colour = {
+            "ERROR": "red", "WARNING": "yellow", "INFO": "blue",
+        }[finding.severity.value]
         console.print(f"  [{colour}]{finding}[/{colour}]")
 
     if out:
@@ -245,36 +246,37 @@ def validate(json_file: str) -> None:
     data = json.loads(path.read_text(encoding="utf-8"))
     errors: list[str] = []
 
-    # Check top-level keys
     for key in ("apis", "links", "details", "patterns"):
         if key not in data:
             errors.append(f"Missing top-level key: '{key}'")
 
-    # Check every API in registry has a detail entry
     detail_ids = set(data.get("details", {}).keys())
     for entry in API_REGISTRY:
         if entry["id"] not in detail_ids:
             errors.append(f"Missing details for {entry['id']}")
 
-    # Check links reference valid API IDs
     valid_ids = {a["id"] for a in data.get("apis", [])}
     for link in data.get("links", []):
         for side in ("source", "target"):
             if link.get(side) not in valid_ids:
-                errors.append(f"Link references unknown API: {link.get(side)!r} in {link}")
+                errors.append(
+                    f"Link references unknown API: {link.get(side)!r} in {link}"
+                )
 
-    # Check transitions reference valid lifecycle states
     for api_id, detail in data.get("details", {}).items():
         states = set(detail.get("lifecycle", []))
         for t in detail.get("transitions", []):
             for side in ("from", "to"):
                 if t.get(side) not in states:
                     errors.append(
-                        f"{api_id}: transition {t} references unknown state '{t.get(side)}'"
+                        f"{api_id}: transition {t}"
+                        f" references unknown state '{t.get(side)}'"
                     )
 
     if errors:
-        console.print(f"[red bold]Validation failed — {len(errors)} error(s):[/red bold]")
+        console.print(
+            f"[red bold]Validation failed — {len(errors)} error(s):[/red bold]"
+        )
         for e in errors:
             console.print(f"  [red]• {e}[/red]")
         sys.exit(1)
@@ -285,28 +287,30 @@ def validate(json_file: str) -> None:
 # ── show ───────────────────────────────────────────────────────────────────────
 @main.command()
 @click.argument("api_id")
-@click.option(
-    "--cache-dir", default=str(DEFAULT_CACHE_DIR), show_default=True,
-)
+@click.option("--cache-dir", default=str(DEFAULT_CACHE_DIR), show_default=True)
 def show(api_id: str, cache_dir: str) -> None:
     """Pretty-print extracted metadata for one API (reads from cache)."""
 
     api_id = api_id.upper()
     entry  = next((a for a in API_REGISTRY if a["id"] == api_id), None)
     if not entry:
-        console.print(f"[red]Unknown API: {api_id}. Valid: {', '.join(API_IDS)}[/red]")
+        console.print(
+            f"[red]Unknown API: {api_id}. Valid: {', '.join(API_IDS)}[/red]"
+        )
         sys.exit(1)
 
     cache_path = Path(cache_dir) / f"{api_id}.json"
     if not cache_path.exists():
-        console.print(f"[yellow]Cache miss for {api_id}. Run 'generate' first.[/yellow]")
+        console.print(
+            f"[yellow]Cache miss for {api_id}. Run 'generate' first.[/yellow]"
+        )
         sys.exit(1)
 
+    from tmf_spec_parser.config import TERMINAL_STATES, TRANSITIONS
     from tmf_spec_parser.extractor import extract
+
     spec = json.loads(cache_path.read_text(encoding="utf-8"))
     data = extract(api_id, spec)
-
-    from tmf_spec_parser.config import TERMINAL_STATES, TRANSITIONS
     data["terminal"]    = TERMINAL_STATES.get(api_id, [])
     data["transitions"] = TRANSITIONS.get(api_id, [])
 
@@ -317,21 +321,22 @@ def show(api_id: str, cache_dir: str) -> None:
         title=api_id, border_style="cyan",
     ))
 
-    # Entities table
     if data["entities"]:
         tbl = Table(title="Entities", show_header=True, header_style="bold")
         tbl.add_column("Entity")
         tbl.add_column("Mandatory fields")
         tbl.add_column("Optional fields")
         for e in data["entities"]:
+            opt_preview = ", ".join(e["optional"][:6])
+            if len(e["optional"]) > 6:
+                opt_preview += "…"
             tbl.add_row(
                 e["name"],
                 ", ".join(e["mandatory"]) or "—",
-                ", ".join(e["optional"][:6]) + ("…" if len(e["optional"]) > 6 else "") or "—",
+                opt_preview or "—",
             )
         console.print(tbl)
 
-    # Lifecycle
     if data["lifecycle"]:
         states_str = " → ".join(
             f"[red]{s}[/red]" if s in data["terminal"] else s
@@ -340,11 +345,12 @@ def show(api_id: str, cache_dir: str) -> None:
         console.print(f"\n[bold]Lifecycle:[/bold] {states_str}")
         console.print(f"[bold]Transitions:[/bold] {len(data['transitions'])} defined")
 
-    # Cross-API links
     if data.get("links"):
-        console.print(f"\n[bold]Cross-API links:[/bold]")
+        console.print("\n[bold]Cross-API links:[/bold]")
         for link in data["links"]:
-            console.print(f"  → [cyan]{link['target']}[/cyan]  [dim]{link['label']}[/dim]")
+            console.print(
+                f"  → [cyan]{link['target']}[/cyan]  [dim]{link['label']}[/dim]"
+            )
 
 
 # ── cache ──────────────────────────────────────────────────────────────────────
@@ -380,4 +386,6 @@ def cache_clear(cache_dir: str) -> None:
     for f in path.glob("*.json"):
         f.unlink()
         removed += 1
-    console.print(f"[green]✓[/green] Removed {removed} cached file(s) from {path}")
+    console.print(
+        f"[green]✓[/green] Removed {removed} cached file(s) from {path}"
+    )
