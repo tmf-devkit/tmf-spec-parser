@@ -94,10 +94,13 @@ def test_build_details_specref_format():
 
 
 def test_build_details_fallback_for_unfetched():
+    """When no spec is fetched, curated baseline fills entities/lifecycle/transitions."""
     details = _build_details({})
     assert "TMF638" in details
-    assert details["TMF638"]["entities"] == []
-    assert isinstance(details["TMF638"]["transitions"], list)
+    # Baseline now fills entities — not empty (this is the correct v0.2 behaviour)
+    assert len(details["TMF638"]["entities"]) > 0
+    assert len(details["TMF638"]["lifecycle"]) > 0
+    assert len(details["TMF638"]["transitions"]) > 0
 
 
 # ── build() ───────────────────────────────────────────────────────────────────

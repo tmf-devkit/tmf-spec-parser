@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
+import pytest
+
 from tmf_spec_parser.extractor import (
-    _extract_cross_api_links,
-    _extract_lifecycle_from_schema,
+    _extract_entities,
+    _extract_links,
     _extract_mandatory_optional,
     _get_schemas,
     _is_root_entity,
     _spec_description,
     _spec_version,
     extract,
+    extract_lifecycle,
 )
 
 # ── _get_schemas ──────────────────────────────────────────────────────────────
@@ -54,9 +57,6 @@ def test_spec_description_empty():
 
 # ── _is_root_entity ───────────────────────────────────────────────────────────
 
-import pytest  # noqa: E402
-
-
 @pytest.mark.parametrize("name,schema,expected", [
     ("ServiceOrder",     {"properties": {"id": {}}},    True),
     ("ServiceRef",       {"properties": {"id": {}}},    False),
@@ -94,11 +94,12 @@ def test_extract_mandatory_optional_caps_optional():
     assert len(optional) <= 12
 
 
-# ── _extract_lifecycle_from_schema ────────────────────────────────────────────
+# ── extract_lifecycle ─────────────────────────────────────────────────────────
 
 def test_extract_lifecycle_inline_enum(tmf641_spec):
     schemas = _get_schemas(tmf641_spec)
-    states = _extract_lifecycle_from_schema(schemas["ServiceOrder"], schemas)
+    entities = _extract_entities(schemas)
+    states = extract_lifecycle("TMF641", schemas, entities)
     assert "acknowledged" in states
     assert "completed" in states
     assert "cancelled" in states
@@ -106,47 +107,50 @@ def test_extract_lifecycle_inline_enum(tmf641_spec):
 
 def test_extract_lifecycle_tmf638(tmf638_spec):
     schemas = _get_schemas(tmf638_spec)
-    states = _extract_lifecycle_from_schema(schemas["Service"], schemas)
+    entities = _extract_entities(schemas)
+    states = extract_lifecycle("TMF638", schemas, entities)
     assert "active" in states
     assert "terminated" in states
 
 
 def test_extract_lifecycle_swagger2(swagger2_spec):
     schemas = _get_schemas(swagger2_spec)
-    states = _extract_lifecycle_from_schema(schemas["Individual"], schemas)
+    entities = _extract_entities(schemas)
+    states = extract_lifecycle("TMF632", schemas, entities)
     assert "validated" in states
 
 
 def test_extract_lifecycle_no_state_field():
     schema = {"properties": {"name": {"type": "string"}}}
-    assert _extract_lifecycle_from_schema(schema, {}) == []
+    states = extract_lifecycle("TMF999", {"X": schema}, [])
+    assert states == []
 
 
-# ── _extract_cross_api_links ──────────────────────────────────────────────────
+# ── _extract_links ────────────────────────────────────────────────────────────
 
-def test_cross_api_links_tmf641_references_tmf638(tmf641_spec):
+def test_extract_links_tmf641_references_tmf638(tmf641_spec):
     schemas = _get_schemas(tmf641_spec)
-    links = _extract_cross_api_links("TMF641", schemas)
+    links = _extract_links("TMF641", schemas)
     targets = {lnk["target"] for lnk in links}
     assert "TMF638" in targets
 
 
-def test_cross_api_links_tmf638_references_tmf639(tmf638_spec):
+def test_extract_links_tmf638_references_tmf639(tmf638_spec):
     schemas = _get_schemas(tmf638_spec)
-    links = _extract_cross_api_links("TMF638", schemas)
+    links = _extract_links("TMF638", schemas)
     targets = {lnk["target"] for lnk in links}
     assert "TMF639" in targets
 
 
-def test_cross_api_links_no_self_reference(tmf641_spec):
+def test_extract_links_no_self_reference(tmf641_spec):
     schemas = _get_schemas(tmf641_spec)
-    links = _extract_cross_api_links("TMF641", schemas)
+    links = _extract_links("TMF641", schemas)
     assert all(lnk["source"] != lnk["target"] for lnk in links)
 
 
-def test_cross_api_links_deduplicated(tmf641_spec):
+def test_extract_links_deduplicated(tmf641_spec):
     schemas = _get_schemas(tmf641_spec)
-    links = _extract_cross_api_links("TMF641", schemas)
+    links = _extract_links("TMF641", schemas)
     keys = [(lnk["source"], lnk["target"], lnk["label"]) for lnk in links]
     assert len(keys) == len(set(keys))
 
