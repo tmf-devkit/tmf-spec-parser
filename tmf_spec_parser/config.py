@@ -62,6 +62,11 @@ API_REGISTRY: list[dict] = [
         "domain": "service", "short": "Service Qual",
         "repo": "TMF645_ServiceQualification",
     },
+    {
+        "id": "TMF653", "name": "Service Test",
+        "domain": "service", "short": "Service Test",
+        "repo": "TMF653_ServiceTestManagement",
+    },
     # Resource domain
     {
         "id": "TMF634", "name": "Resource Catalog",
@@ -77,11 +82,6 @@ API_REGISTRY: list[dict] = [
         "id": "TMF652", "name": "Resource Ordering",
         "domain": "resource", "short": "Resource Ordering",
         "repo": "TMF652_ResourceOrderManagement",
-    },
-    {
-        "id": "TMF653", "name": "Service Test",
-        "domain": "resource", "short": "Service Test",
-        "repo": "TMF653_ServiceTestManagement",
     },
     # Engagement domain
     {
