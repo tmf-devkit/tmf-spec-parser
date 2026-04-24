@@ -11,9 +11,9 @@ CACHE = pathlib.Path.home() / ".tmf-spec-parser" / "cache"
 # Add project to path
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 
-from tmf_spec_parser.extractor import extract
-from tmf_spec_parser.emitter import _merge_with_baseline, _build_details
-from tmf_spec_parser.config import API_REGISTRY
+from tmf_spec_parser.config import API_REGISTRY  # noqa: E402
+from tmf_spec_parser.emitter import _build_details  # noqa: E402
+from tmf_spec_parser.extractor import extract  # noqa: E402
 
 ALL_APIS = [a["id"] for a in API_REGISTRY]
 
