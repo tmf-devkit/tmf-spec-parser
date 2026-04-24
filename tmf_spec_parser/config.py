@@ -20,11 +20,6 @@ API_REGISTRY: list[dict] = [
         "domain": "customer", "short": "Customer Mgmt",
         "repo": "TMF629_CustomerManagement",
     },
-    {
-        "id": "TMF632", "name": "Party Management",
-        "domain": "customer", "short": "Party Mgmt",
-        "repo": "TMF632_PartyManagement",
-    },
     # Product domain
     {
         "id": "TMF620", "name": "Product Catalog",
@@ -94,7 +89,12 @@ API_REGISTRY: list[dict] = [
         "domain": "engagement", "short": "Service Problem",
         "repo": "TMF656_ServiceProblemManagement",
     },
-    # Common
+    # Common domain — shared base abstractions used across all domains
+    {
+        "id": "TMF632", "name": "Party Management",
+        "domain": "common", "short": "Party Mgmt",
+        "repo": "TMF632_PartyManagement",
+    },
     {
         "id": "TMF688", "name": "Event Management",
         "domain": "common", "short": "Event Mgmt",

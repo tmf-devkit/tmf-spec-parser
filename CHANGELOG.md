@@ -3,6 +3,30 @@
 All notable changes to tmf-spec-parser are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.2.2] — 2026-04-24
+
+### Fixed
+- TMF632 Party Management domain corrected from `customer` to `common`. In the
+  TMForum SID, Party is a shared base abstraction (Individual, Organization)
+  that Customer (TMF629) extends — it underpins every domain, not just Customer.
+  (v0.2.1 shipped without this fix applied to the source tree; this release
+  corrects the regression.)
+
+## [0.2.1] — 2026-04-24
+
+### Fixed
+- **Edge labels**: all 22 entries in `SCHEMA_TO_LABEL` replaced with factual
+  `references X` labels. Previous action-verb labels (`creates Service`,
+  `triggers ServiceOrder`, `creates ResourceOrder`, `triggers ProductOrder`)
+  injected architectural causality that is not in the OpenAPI specs. Edges
+  drawn by tmf-map now describe the structural fact — the source API's schemas
+  contain a `$ref` to the target entity — without making dependency claims that
+  belong to the ODA Component layer. The `RelatedParty` label (`has RelatedParty`)
+  is retained since it is a direct embed, not a ref-by-id.
+- TMF653 Service Test domain corrected from `resource` to `service`. Service
+  Test tests *services* (operates against TMF638 Service Inventory), not
+  resources — it belongs in the service management stack.
+
 ## [0.2.0] — 2026-04-18
 
 ### Fixed
