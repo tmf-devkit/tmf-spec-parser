@@ -3,6 +3,28 @@
 All notable changes to tmf-spec-parser are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.2.4] — 2026-04-25
+
+### Fixed
+- **Fetcher filename scoring** — the substring blocklist used to reject test
+  artifacts contained `"test"`, which incorrectly rejected every spec file in
+  TMF653 Service Test Management (since the API name itself contains "Test").
+  Replaced the blocklist with explicit markers (`ctk`, `callback`, `notification`,
+  `hub`, `listener`, `.admin.`) that target the actual non-primary file
+  variants. CTK files are caught by the `ctk` marker; admin variants are
+  caught by `.admin.`.
+
+### Improved
+- **Filename scoring** boosts files matching the canonical TMF prefix pattern
+  (`TMFxxx-` or `TMFxxx_`) by 5 points, so the official primary spec wins over
+  legacy/admin variants in repos with multiple candidates.
+- **Version-aware tie-breaking** — when multiple spec files have the same score
+  (e.g. v3.0.0, v4.0.0, v4.1.0, v4.2.0), the highest version wins instead of
+  alphabetical order. Picks v4.2.0 over v4.1.0 over v4.0.0.
+- Added `_swagger.json` (underscore variant) to the recognised swagger
+  extensions, supporting filenames like
+  `TMF653_Service_Test_Management_API_v4.2.0_swagger.json`.
+
 ## [0.2.3] — 2026-04-24
 
 ### Fixed

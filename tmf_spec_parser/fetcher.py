@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 from pathlib import Path
 
@@ -39,6 +40,27 @@ _RAW_BASE = "https://raw.githubusercontent.com/{org}/{repo}/{branch}/{path}"
 # Branches to try for raw URL access, in order. 'main' first because most
 # modern TMForum repos have switched to it (TMF653, and increasingly others).
 _BRANCHES_TO_TRY = ("main", "master")
+
+# Filename markers that indicate a non-primary spec file we should skip.
+# NOTE: 'test' is intentionally NOT here — it would block legitimate spec files
+# for APIs whose name contains "Test" (e.g., TMF653 Service Test Management).
+# 'ctk' captures Conformance Test Kit files (the real test artifacts).
+_FILENAME_BLOCKLIST = (
+    "ctk",          # Conformance Test Kit
+    "callback",     # Callback/listener variant
+    "notification", # Notification/event variant
+    "hub",          # Hub registration variant
+    "listener",     # Listener registration variant
+    ".admin.",      # Admin spec variant (e.g., Service_Test_Management.admin.swagger.json)
+)
+
+# Pattern to extract a version tuple like (4, 2, 0) from filenames such as
+# TMF653-ServiceTest-v4.1.0.swagger.json or TMF653_..._API_v4.2.0_swagger.json
+_VERSION_RE = re.compile(r"v?(\d+)\.(\d+)(?:\.(\d+))?", re.IGNORECASE)
+
+# Pattern that matches the canonical TMForum filename prefix (TMFxxx-...)
+# and confirms a "primary" file as opposed to admin/regular variants.
+_TMF_PREFIX_RE = re.compile(r"^tmf\d+[-_]", re.IGNORECASE)
 
 
 class FetchError(Exception):
@@ -76,36 +98,70 @@ def _list_dir(url: str, client: httpx.Client) -> list[dict]:
     return data if isinstance(data, list) else []
 
 
+def _extract_version(name: str) -> tuple[int, int, int]:
+    """Extract a (major, minor, patch) version tuple from a filename. (0,0,0) if none."""
+    m = _VERSION_RE.search(name)
+    if not m:
+        return (0, 0, 0)
+    major = int(m.group(1))
+    minor = int(m.group(2))
+    patch = int(m.group(3)) if m.group(3) else 0
+    return (major, minor, patch)
+
+
 def _score_filename(name: str) -> int:
-    """Higher score = more likely to be the primary OpenAPI spec."""
+    """
+    Higher score = more likely to be the primary OpenAPI spec.
+    Returns 0 for files we don't want.
+    """
     nl = name.lower()
-    if any(x in nl for x in ("ctk", "test", "callback", "notification", "hub", "listener")):
+
+    # Reject files with blocklisted markers (CTK, callback, admin variant, etc.)
+    if any(x in nl for x in _FILENAME_BLOCKLIST):
         return 0
-    if nl.endswith(".swagger.json"):
-        return 10
-    if nl.endswith(".oas.json") or nl.endswith("openapi.json"):
-        return 8
-    if nl.endswith(".json"):
-        return 5
-    if nl.endswith((".yaml", ".yml")):
-        return 4
-    return 0
+
+    # Score by extension
+    if nl.endswith(".swagger.json") or nl.endswith("_swagger.json"):
+        base_score = 10
+    elif nl.endswith(".oas.json") or nl.endswith("openapi.json"):
+        base_score = 8
+    elif nl.endswith(".json"):
+        base_score = 5
+    elif nl.endswith((".yaml", ".yml")):
+        base_score = 4
+    else:
+        return 0
+
+    # Boost files with the canonical TMFxxx- prefix (the official primary spec
+    # naming convention). Distinguishes TMF653-ServiceTest-v4.0.0.swagger.json
+    # from Service_Test_Management.admin.swagger.json.
+    if _TMF_PREFIX_RE.match(name):
+        base_score += 5
+
+    return base_score
 
 
 def _best_spec_file(entries: list[dict]) -> str | None:
-    """Pick the best OpenAPI spec filename from a directory listing."""
-    candidates: list[tuple[int, str]] = []
+    """Pick the best OpenAPI spec filename from a directory listing.
+
+    Among files with the highest score, prefer the highest version number
+    (so v4.2.0 wins over v4.0.0 wins over v3.0.0).
+    """
+    candidates: list[tuple[int, tuple[int, int, int], str]] = []
     for entry in entries:
         if entry.get("type") != "file":
             continue
-        score = _score_filename(entry["name"])
+        name = entry["name"]
+        score = _score_filename(name)
         if score:
-            rel = entry.get("path", entry["name"])
-            candidates.append((score, rel))
+            rel = entry.get("path", name)
+            version = _extract_version(name)
+            candidates.append((score, version, rel))
     if not candidates:
         return None
+    # Sort by (score, version) descending; highest wins.
     candidates.sort(reverse=True)
-    return candidates[0][1]
+    return candidates[0][2]
 
 
 def _fetch_raw(url: str, client: httpx.Client) -> httpx.Response | None:
