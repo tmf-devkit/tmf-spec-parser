@@ -4,10 +4,11 @@ fetcher.py — Download TMForum OpenAPI specs from GitHub with local caching.
 Strategy:
   1. Check local cache directory first.
   2. If missing or --refresh flag set, fetch from GitHub.
-  3. Try the GitHub Contents API first (lists actual filenames).
+  3. Try the GitHub Contents API first (lists actual filenames, uses default branch).
      Fall back to probing known filename patterns directly.
   4. If the spec is not at the repo root, search one level of subdirectories.
-  5. Optionally use a GitHub personal access token (env: GITHUB_TOKEN) to
+  5. For raw URL access, try `main` branch first (newer repos), fall back to `master`.
+  6. Optionally use a GitHub personal access token (env: GITHUB_TOKEN) to
      avoid the 60 req/hr anonymous rate limit.
 """
 
@@ -32,8 +33,12 @@ DEFAULT_CACHE_DIR = Path.home() / ".tmf-spec-parser" / "cache"
 # Spec file extensions we'll accept
 SPEC_EXTENSIONS = (".swagger.json", ".oas.json", ".json", ".yaml", ".yml")
 
-# Raw content URL — note {path} not {filename} to support subdirs
-_RAW_BASE = "https://raw.githubusercontent.com/{org}/{repo}/master/{path}"
+# Raw content URL template — {branch} tried in order: main, master
+_RAW_BASE = "https://raw.githubusercontent.com/{org}/{repo}/{branch}/{path}"
+
+# Branches to try for raw URL access, in order. 'main' first because most
+# modern TMForum repos have switched to it (TMF653, and increasingly others).
+_BRANCHES_TO_TRY = ("main", "master")
 
 
 class FetchError(Exception):
@@ -48,9 +53,12 @@ def _github_headers() -> dict[str, str]:
     return headers
 
 
-def _raw_url(repo: str, path: str) -> str:
-    """Build a raw.githubusercontent.com URL. path may include subdirectory."""
-    return _RAW_BASE.format(org=GITHUB_ORG, repo=repo, path=path)
+def _raw_urls(repo: str, path: str) -> list[str]:
+    """Build raw.githubusercontent.com URLs for each branch we try."""
+    return [
+        _RAW_BASE.format(org=GITHUB_ORG, repo=repo, branch=br, path=path)
+        for br in _BRANCHES_TO_TRY
+    ]
 
 
 def _contents_url(repo: str, subdir: str = "") -> str:
@@ -106,6 +114,18 @@ def _fetch_raw(url: str, client: httpx.Client) -> httpx.Response | None:
     return resp if resp.status_code == 200 else None
 
 
+def _fetch_raw_any_branch(
+    repo: str, path: str, client: httpx.Client, delay: float
+) -> httpx.Response | None:
+    """Try each branch in _BRANCHES_TO_TRY until one returns 200."""
+    for url in _raw_urls(repo, path):
+        resp = _fetch_raw(url, client)
+        time.sleep(delay)
+        if resp:
+            return resp
+    return None
+
+
 def _parse_spec(resp: httpx.Response, api_id: str, url: str) -> dict:
     """Parse a 200 response as JSON or YAML into a dict."""
     content_type = resp.headers.get("content-type", "")
@@ -157,9 +177,12 @@ def _fetch_from_github(
 ) -> dict:
     """
     Multi-strategy fetch:
-    1. List repo root via Contents API, pick best spec file.
+    1. List repo root via Contents API (uses default branch), pick best spec file.
     2. Scan one level of subdirectories if root has nothing suitable.
     3. Fall back to probing well-known filenames on raw URLs.
+
+    For raw URL fetches, we try both `main` and `master` since the TMForum org
+    has a mix (older repos on master, newer ones like TMF653 on main).
     """
 
     # Strategy 1: root directory listing
@@ -169,12 +192,10 @@ def _fetch_from_github(
     if root_entries:
         rel_path = _best_spec_file(root_entries)
         if rel_path:
-            url = _raw_url(repo, rel_path)
-            resp = _fetch_raw(url, client)
-            time.sleep(delay)
+            resp = _fetch_raw_any_branch(repo, rel_path, client, delay)
             if resp:
                 try:
-                    spec = _parse_spec(resp, api_id, url)
+                    spec = _parse_spec(resp, api_id, str(resp.url))
                     if _is_real_spec(spec):
                         return spec
                 except FetchError:
@@ -190,12 +211,10 @@ def _fetch_from_github(
                 continue
             rel_path = _best_spec_file(sub_entries)
             if rel_path:
-                url = _raw_url(repo, rel_path)
-                resp = _fetch_raw(url, client)
-                time.sleep(delay)
+                resp = _fetch_raw_any_branch(repo, rel_path, client, delay)
                 if resp:
                     try:
-                        spec = _parse_spec(resp, api_id, url)
+                        spec = _parse_spec(resp, api_id, str(resp.url))
                         if _is_real_spec(spec):
                             return spec
                     except FetchError:
@@ -203,12 +222,10 @@ def _fetch_from_github(
 
     # Strategy 3: direct raw URL probes (for when Contents API rate-limits)
     for filename in ["swagger.json", f"{api_id}.swagger.json", "openapi.json"]:
-        url = _raw_url(repo, filename)
-        resp = _fetch_raw(url, client)
-        time.sleep(delay)
+        resp = _fetch_raw_any_branch(repo, filename, client, delay)
         if resp:
             try:
-                spec = _parse_spec(resp, api_id, url)
+                spec = _parse_spec(resp, api_id, str(resp.url))
                 if _is_real_spec(spec):
                     return spec
             except FetchError:

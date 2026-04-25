@@ -3,6 +3,15 @@
 All notable changes to tmf-spec-parser are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.2.3] — 2026-04-24
+
+### Fixed
+- **Fetcher branch handling**: raw URL fetches now try `main` first and fall
+  back to `master`. Previously hardcoded `master`, which caused TMF653 (and any
+  other repos that have switched their default branch to `main`) to fail with
+  "Could not download a valid spec". The Contents API call already used the
+  default branch — only the raw URL probes were affected.
+
 ## [0.2.2] — 2026-04-24
 
 ### Fixed
