@@ -277,3 +277,80 @@ def test_create_variant_does_not_seed_lifecycle():
     states   = extract_lifecycle("TMF638", schemas, entities)
     # The Service primary entity has no enum, ServiceCreate is a variant -> []
     assert "draft-state-1" not in states
+
+
+# ── Bug 3 — entity ranking: API's primary entity must beat alien larger ones ──
+#
+# The TMF652 Resource Ordering spec contains both a `ResourceOrder` schema
+# (the API's actual primary entity) and a `Resource` schema (a copy of
+# TMF639's primary entity, used as the ResourceRefOrValue base). Because
+# `Resource` has more fields than `ResourceOrder`, the field-count-only
+# ranking pushed `ResourceOrder` out of the top-4 entity cap, and the
+# lifecycle extractor then walked `Resource.resourceStatus` and returned
+# inventory states (standby, alarm, available) as TMF652's lifecycle.
+#
+# The fix: rank entities by domain-name overlap with the API's name first
+# (TMF652 = 'Resource Ordering' -> stems ['resource','order'], so
+# ResourceOrder scores 2 vs Resource scoring 1).
+
+def test_primary_entity_wins_over_larger_alien_entity():
+    """When a spec contains both the API's primary entity and a copy of
+    another API's primary entity (which happens to have more fields),
+    the API's own primary entity should be ranked first."""
+    spec = {
+        "openapi": "3.0.0",
+        "info": {"version": "4.0.0", "title": "Resource Ordering Management"},
+        "components": {"schemas": {
+            # Alien entity copied from TMF639 — has many fields
+            "Resource": {
+                "type": "object", "required": ["id"],
+                "properties": {
+                    "id":             {"type": "string"},
+                    "name":           {"type": "string"},
+                    "category":       {"type": "string"},
+                    "description":    {"type": "string"},
+                    "resourceStatus": {"type": "string"},
+                    "f6": {"type": "string"}, "f7": {"type": "string"},
+                    "f8": {"type": "string"}, "f9": {"type": "string"},
+                    "f10": {"type": "string"}, "f11": {"type": "string"},
+                },
+            },
+            # The API's actual primary entity — fewer fields
+            "ResourceOrder": {
+                "type": "object", "required": ["id"],
+                "properties": {
+                    "id":          {"type": "string"},
+                    "description": {"type": "string"},
+                    "state":       {"type": "string"},
+                },
+            },
+        }},
+    }
+    schemas  = _get_schemas(spec)
+    entities = _extract_entities(schemas, api_id="TMF652")
+    names    = [e["name"] for e in entities]
+
+    # ResourceOrder must be ranked first — it's the API's domain entity
+    assert names[0] == "ResourceOrder", (
+        f"Expected ResourceOrder first, got {names}"
+    )
+
+
+def test_entity_ranking_falls_back_when_no_api_id():
+    """With no api_id, the legacy field-count ordering applies (no regression
+    for callers that don't pass api_id)."""
+    spec = {
+        "openapi": "3.0.0",
+        "info": {"version": "4.0.0"},
+        "components": {"schemas": {
+            "Big":   {"type": "object", "properties": {
+                f"f{i}": {"type": "string"} for i in range(8)
+            }},
+            "Small": {"type": "object", "properties": {
+                "a": {"type": "string"}
+            }},
+        }},
+    }
+    schemas  = _get_schemas(spec)
+    entities = _extract_entities(schemas)
+    assert [e["name"] for e in entities] == ["Big", "Small"]

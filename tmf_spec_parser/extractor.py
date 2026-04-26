@@ -19,6 +19,7 @@ import re
 from typing import Any
 
 from tmf_spec_parser.config import (
+    API_REGISTRY,
     SCHEMA_TO_API,
     SCHEMA_TO_LABEL,
 )
@@ -58,6 +59,65 @@ _VARIANT_SUFFIXES = ("FVO", "MVO", "Create", "Update", "Patch", "Event",
 _STATE_NAME_SUFFIX_RE = re.compile(
     r"(StatusType|StateType|LifecycleType|LifecycleStatus|Lifecycle|Status|State)$",
 )
+
+# Generic words to drop when deriving an API's domain stems from its name
+_API_NAME_GENERIC_WORDS = {
+    "management", "api", "open", "tmf", "specification", "mgmt",
+}
+
+
+def _word_stem(word: str) -> str:
+    """Cheap stemming so 'Ordering' matches 'Order' and 'Tickets' matches 'Ticket'.
+    Not a real stemmer — just enough for TMF API name ↔ entity name matching."""
+    w = word.lower()
+    if w.endswith("ing"):
+        return w[:-3]
+    if w.endswith("s") and len(w) > 3:
+        return w[:-1]
+    return w
+
+
+def _api_domain_stems(api_id: str) -> list[str]:
+    """Return the lowercase domain word-stems for an API based on its registry
+    entry, e.g. 'Resource Ordering' -> ['resource', 'order'].
+    Used to rank entities by how strongly their name matches the API's domain.
+    """
+    for entry in API_REGISTRY:
+        if entry.get("id") == api_id:
+            words = re.split(r"[\s_]+", entry.get("name", ""))
+            stems = [
+                _word_stem(w)
+                for w in words
+                if w and w.lower() not in _API_NAME_GENERIC_WORDS
+            ]
+            return [s for s in stems if s]
+    return []
+
+
+def _entity_words(entity_name: str) -> set[str]:
+    """Split a CamelCase entity name into its lowercase words.
+    'ResourceOrderItem' -> {'resource', 'order', 'item'}."""
+    return {w.lower() for w in re.findall(r"[A-Z][a-z]*", entity_name) if w}
+
+
+def _domain_overlap_score(api_stems: list[str], entity_name: str) -> int:
+    """Number of API domain stems that exactly match a CamelCase word in the
+    entity name. Higher = stronger evidence the entity is the API's primary.
+
+    Example: api 'Resource Ordering' (stems ['resource','order']) vs:
+      ResourceOrder       -> 2 (both match)
+      Resource            -> 1 ('resource' matches)
+      ResourceRefOrValue  -> 1 ('resource' matches; 'or' is an exact word but
+                                 doesn't equal 'order' — substring matches
+                                 are intentionally not counted)
+      Attachment          -> 0
+    """
+    if not api_stems:
+        return 0
+    ews = _entity_words(entity_name)
+    if not ews:
+        return 0
+    return sum(1 for s in api_stems if s in ews)
 
 
 # ── Schema location ───────────────────────────────────────────────────────────
@@ -333,11 +393,23 @@ def _extract_mandatory_optional(
     return mandatory, optional[:12]
 
 
-def _extract_entities(schemas: dict[str, dict]) -> list[dict]:
+def _extract_entities(
+    schemas: dict[str, dict],
+    api_id: str | None = None,
+) -> list[dict]:
     """
     Extract root entities from all schemas.
-    Sorted by total field count (most fields first), capped at 4.
+    Sort key: (-domain_overlap, -field_count) so entities matching the API's
+    domain words come first, ties broken by total field count. Capped at 4.
+
+    The domain-overlap pre-rank prevents helper / cross-API entities (e.g.
+    `Resource`, `Attachment`, `ResourceRefOrValue` in the TMF652 spec) from
+    pushing the API's actual primary entity (e.g. `ResourceOrder`) out of
+    the top-4 truncation. When `api_id` is None or unknown, falls back to
+    plain field-count ranking.
     """
+    api_stems = _api_domain_stems(api_id) if api_id else []
+
     entities: list[dict] = []
     for name, schema in schemas.items():
         if not _is_root_entity(name, schema):
@@ -349,10 +421,15 @@ def _extract_entities(schemas: dict[str, dict]) -> list[dict]:
             "name":      name,
             "mandatory": mandatory,
             "optional":  optional,
+            "_overlap":  _domain_overlap_score(api_stems, name),
+            "_total":    len(mandatory) + len(optional),
         })
 
-    entities.sort(key=lambda e: len(e["mandatory"]) + len(e["optional"]), reverse=True)
-    return entities[:4]
+    entities.sort(key=lambda e: (-e["_overlap"], -e["_total"]))
+    return [
+        {"name": e["name"], "mandatory": e["mandatory"], "optional": e["optional"]}
+        for e in entities[:4]
+    ]
 
 
 # ── Cross-API link extraction ─────────────────────────────────────────────────
@@ -444,7 +521,7 @@ def extract(api_id: str, spec: dict) -> dict:
     schemas    = _get_schemas(spec)
     version    = _spec_version(spec)
     description = _spec_description(spec)
-    entities   = _extract_entities(schemas)
+    entities   = _extract_entities(schemas, api_id)
     lifecycle  = extract_lifecycle(api_id, schemas, entities)
     links      = _extract_links(api_id, schemas)
 

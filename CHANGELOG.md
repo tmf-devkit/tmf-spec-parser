@@ -3,6 +3,42 @@
 All notable changes to tmf-spec-parser are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.2.6] — 2026-04-26
+
+### Fixed
+- **Entity ranking now domain-aware (Bug 3)**: TMF652 Resource Ordering still
+  produced a wrong lifecycle (`standby, alarm, available`) after v0.2.5
+  because its OpenAPI spec contains both `ResourceOrder` (the API's actual
+  primary entity) and `Resource` (a copy of TMF639's primary entity, used
+  as the ResourceRefOrValue base). `Resource` has more fields than
+  `ResourceOrder`, so the field-count-only ranking pushed `ResourceOrder`
+  past the top-4 entity cap. Lifecycle extraction then walked the alien
+  `Resource` entity and returned its `resourceStatus` enum.
+
+  `_extract_entities()` now accepts an optional `api_id` parameter and ranks
+  entities first by domain-name overlap with the API's registry name
+  (TMF652 = 'Resource Ordering' → stems `[resource, order]`, so
+  `ResourceOrder` scores 2 and beats `Resource` which scores 1), then by
+  field count as a tie-breaker. `extract()` passes the api_id automatically.
+
+  After this fix TMF652 extracts the correct order states
+  `(acknowledged, terminatedWithError, inProgress, done)` directly from the
+  spec, no baseline merge needed.
+
+### Added
+- 2 new tests in `tests/test_extractor_lifecycle_isolation.py` for Bug 3:
+  one locks in domain-aware ranking with a synthetic two-entity spec, one
+  guards the no-api_id fallback path so callers that don't pass an api_id
+  still get the legacy field-count ordering.
+- New helpers in `extractor.py`: `_word_stem`, `_api_domain_stems`,
+  `_entity_words`, `_domain_overlap_score`. Public API surface gains an
+  optional `api_id` keyword on `_extract_entities`; `extract()` and
+  `extract_all()` are unchanged.
+
+### Behaviour
+- Output schema of `tmf_data.json` is unchanged. APIs that previously
+  ranked correctly still rank correctly. Backwards-compatible patch release.
+
 ## [0.2.5] — 2026-04-26
 
 ### Fixed
