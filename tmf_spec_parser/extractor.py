@@ -40,6 +40,25 @@ _STATE_SCHEMA_PATTERNS = re.compile(
     r"(state|status|lifecycle|phase|condition)", re.IGNORECASE
 )
 
+# Schema-name suffixes that mark generic job/task/operation/integration helpers.
+# TMF Catalog APIs all include ImportJob and ExportJob with a status enum like
+# ('Not Started', 'Running', 'Succeeded', 'Failed') — that's not catalog state.
+# Excluding these prevents Catalog APIs from extracting the wrong lifecycle.
+_GENERIC_HELPER_PATTERNS = re.compile(
+    r"(Job|Task|Operation|Process|Migration|Hub|Listener|Subscription)$",
+)
+
+# Suffixes for entity schemas treated as derived variants — should NOT seed
+# lifecycle on their own (they're create/update payloads, events, etc.).
+_VARIANT_SUFFIXES = ("FVO", "MVO", "Create", "Update", "Patch", "Event",
+                     "Notification", "Request", "Response")
+
+# Suffixes stripped from a state-enum schema name to find its "stem".
+# e.g. ServiceOrderStateType -> ServiceOrder
+_STATE_NAME_SUFFIX_RE = re.compile(
+    r"(StatusType|StateType|LifecycleType|LifecycleStatus|Lifecycle|Status|State)$",
+)
+
 
 # ── Schema location ───────────────────────────────────────────────────────────
 
@@ -55,6 +74,36 @@ def _get_schemas(spec: dict) -> dict[str, dict]:
 def _resolve_ref(ref: str) -> str:
     """'#/definitions/Foo' → 'Foo'"""
     return ref.split("/")[-1]
+
+
+# ── Helper-schema classification (for lifecycle leak protection) ─────────────
+
+def _is_cross_api_helper(name: str) -> bool:
+    """Schema is a known cross-API reference type whose state belongs to a
+    different API (e.g. ResourceRef carries TMF639's resourceStatus enum)."""
+    return name in SCHEMA_TO_API
+
+
+def _is_generic_helper(name: str) -> bool:
+    """Schema is a generic job/task/operation/etc. — its state is not the
+    API's domain lifecycle (e.g. ImportJob, ExportJob in Catalog APIs)."""
+    return bool(_GENERIC_HELPER_PATTERNS.search(name))
+
+
+def _is_variant_entity(name: str) -> bool:
+    """Schema is a derived variant of a root entity (Create/Update/Event)."""
+    return name.endswith(_VARIANT_SUFFIXES)
+
+
+def _is_helper_for_lifecycle(name: str) -> bool:
+    """True if a schema should NOT be treated as authoritative for the API's
+    own primary lifecycle. Used to keep cross-API and generic-helper state
+    enums from leaking into the wrong API's lifecycle extraction."""
+    return (
+        _is_cross_api_helper(name)
+        or _is_generic_helper(name)
+        or _is_variant_entity(name)
+    )
 
 
 # ── Schema walking ────────────────────────────────────────────────────────────
@@ -133,58 +182,123 @@ def _lifecycle_from_entity(
     return []
 
 
-def _lifecycle_from_standalone_enums(schemas: dict[str, dict]) -> list[str]:
+def _lifecycle_from_standalone_enums(
+    schemas: dict[str, dict],
+    entity_names: set[str] | None = None,
+) -> list[str]:
     """
-    Fallback: scan ALL schemas for one that looks like a standalone state enum.
-    Matches schemas whose name contains 'state'/'status'/'lifecycle'
-    AND whose top-level type is string with an enum.
+    Standalone state-enum fallback. Scans schemas whose name looks like a
+    lifecycle helper (`*StateType`, `*StatusType`, `*Lifecycle*`, etc.).
 
-    Returns the enum from the first (largest) matching schema found.
+    Cross-API ref types and generic job/task helpers are skipped — their
+    enums describe a different domain, not the current API's lifecycle.
+
+    When `entity_names` is provided (the normal case), an enum is only
+    accepted if its schema-name stem exactly matches one of the entities,
+    e.g. `ServiceOrderStateType` (stem = `ServiceOrder`) is accepted for
+    an API whose primary entity is `ServiceOrder`. `ResourceStatusType`
+    (stem = `Resource`) is rejected for an API whose entity is
+    `ResourceOrder`, because `Resource` ≠ `ResourceOrder`.
+
+    When no entity names are known (sparse test specs), the largest enum
+    found among the candidate schemas is returned as a last resort.
     """
-    candidates: list[tuple[int, list[str]]] = []
+    related_candidates: list[tuple[int, list[str]]] = []
+    fallback_candidates: list[tuple[int, list[str]]] = []
+
     for name, schema in schemas.items():
         if not _STATE_SCHEMA_PATTERNS.search(name):
             continue
-        # Must be a simple string enum at top level
+        if _is_cross_api_helper(name) or _is_generic_helper(name):
+            continue
+
+        stem = _STATE_NAME_SUFFIX_RE.sub("", name)
+        is_related = bool(entity_names) and stem in entity_names
+        bucket = related_candidates if is_related else fallback_candidates
+
+        # Direct top-level string enum
         if schema.get("type") == "string" and "enum" in schema:
             values = [str(v) for v in schema["enum"] if v is not None]
             if len(values) >= 2:
-                candidates.append((len(values), values))
-        # Or an allOf/oneOf wrapping a string enum
+                bucket.append((len(values), values))
+        # Wrapped in allOf/anyOf/oneOf
         for combiner in ("allOf", "anyOf", "oneOf"):
             for sub in schema.get(combiner, []):
                 if sub.get("type") == "string" and "enum" in sub:
                     values = [str(v) for v in sub["enum"] if v is not None]
                     if len(values) >= 2:
-                        candidates.append((len(values), values))
+                        bucket.append((len(values), values))
 
-    if not candidates:
-        return []
-    candidates.sort(reverse=True)
-    return candidates[0][1]
+    if related_candidates:
+        related_candidates.sort(reverse=True)
+        return related_candidates[0][1]
+    # Only fall back to unrelated enums if no entities are known to relate to.
+    if not entity_names and fallback_candidates:
+        fallback_candidates.sort(reverse=True)
+        return fallback_candidates[0][1]
+    return []
 
 
 def extract_lifecycle(api_id: str, schemas: dict[str, dict], entities: list[dict]) -> list[str]:
     """
-    Full lifecycle extraction pipeline:
-    1. Try each known root entity first (most reliable)
-    2. Fall back to scanning all schemas for state enum helpers
+    Full lifecycle extraction pipeline with cross-domain leak protection.
+
+    1. PRIMARY entities first: try root entities that are NOT cross-API ref
+       types, generic job/task helpers, or variants. This is the authoritative
+       source — the API's own primary entity defines its lifecycle.
+    2. Broad scan over non-helper schemas (e.g. items / sub-entities) when
+       primary entities don't yield states. Schemas whose name relates to a
+       primary entity are tried first.
+    3. Standalone enum scan: only enums whose schema-name stem exactly
+       matches a primary entity are accepted (prevents `ResourceStatusType`
+       from leaking into `ResourceOrder`).
+    4. Last-resort fallback to helper entities, but ONLY if no primary
+       entities exist at all (keeps minimal test specs working).
+
+    Returning [] is the correct outcome when the spec doesn't structurally
+    encode the API's own lifecycle — the curated baseline in emitter.py
+    will fill the gap with verified states.
     """
-    # Try root entities
-    for entity in entities:
+    primary_entities = [e for e in entities if not _is_helper_for_lifecycle(e["name"])]
+    helper_entities  = [e for e in entities if     _is_helper_for_lifecycle(e["name"])]
+    primary_names = {e["name"] for e in primary_entities}
+
+    # Phase 1: primary root entities
+    for entity in primary_entities:
         schema = schemas.get(entity["name"], {})
         states = _lifecycle_from_entity(schema, schemas)
         if states:
             return states
 
-    # Broader scan over all schemas using known field names
-    for _name, schema in schemas.items():
-        states = _lifecycle_from_entity(schema, schemas)
+    # Phase 2: broad scan over non-helper schemas, related-name first
+    related: list[str] = []
+    other: list[str] = []
+    for name in schemas:
+        if _is_helper_for_lifecycle(name):
+            continue
+        if primary_names and any(name.startswith(en) for en in primary_names):
+            related.append(name)
+        else:
+            other.append(name)
+    for name in related + other:
+        states = _lifecycle_from_entity(schemas[name], schemas)
         if states:
             return states
 
-    # Last resort: standalone enum schema scan
-    return _lifecycle_from_standalone_enums(schemas)
+    # Phase 3: standalone state-enum scan with stem-match guard
+    states = _lifecycle_from_standalone_enums(schemas, primary_names)
+    if states:
+        return states
+
+    # Phase 4: last-resort helper entities (only when no primaries exist)
+    if not primary_entities:
+        for entity in helper_entities:
+            schema = schemas.get(entity["name"], {})
+            states = _lifecycle_from_entity(schema, schemas)
+            if states:
+                return states
+
+    return []
 
 
 # ── Entity extraction ─────────────────────────────────────────────────────────

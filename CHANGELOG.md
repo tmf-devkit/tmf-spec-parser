@@ -3,6 +3,44 @@
 All notable changes to tmf-spec-parser are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.2.5] — 2026-04-26
+
+### Fixed
+- **Lifecycle cross-domain leak (Bug 1)**: APIs that embed cross-API `*Ref`
+  schemas (e.g. TMF652 Resource Order embedding `ResourceRef`) used to extract
+  the *referenced* API's lifecycle enum as if it were their own. TMF652's
+  lifecycle was being extracted as `standby, alarm, available` (TMF639
+  Resource Inventory states) instead of order states. The extractor now
+  skips schemas listed in `SCHEMA_TO_API` when scanning for the API's own
+  lifecycle.
+- **Generic-helper status pollution (Bug 2)**: TMF Catalog APIs (TMF620,
+  TMF633, TMF634) ship `ImportJob` and `ExportJob` schemas with a generic
+  CI-style status enum (`Not Started, Running, Succeeded, Failed`). The
+  extractor used to return that as the catalog's lifecycle. Schemas whose
+  name ends in `Job`, `Task`, `Operation`, `Process`, `Migration`, `Hub`,
+  `Listener`, or `Subscription` are now classified as generic helpers and
+  excluded from lifecycle extraction.
+- **Standalone enum stem-match guard**: the standalone state-enum fallback
+  (Phase 3) now requires the schema-name stem to *exactly* match a primary
+  entity name. Previously a `startswith` check let `ResourceStatusType`
+  (stem `Resource`) leak into TMF652 (entity `ResourceOrder`); now only
+  `ResourceOrderStateType` (stem `ResourceOrder`) is accepted.
+
+### Added
+- 7 new tests in `tests/test_extractor_lifecycle_isolation.py` locking in
+  correct behaviour for both leak classes and the variant-suffix case
+  (`ServiceCreate` should never seed lifecycle for `Service`).
+- New helper functions in `extractor.py`: `_is_cross_api_helper`,
+  `_is_generic_helper`, `_is_variant_entity`, `_is_helper_for_lifecycle`.
+  Public API surface is unchanged.
+
+### Behaviour
+- When the spec doesn't structurally encode the API's own lifecycle,
+  `extract_lifecycle()` now returns `[]` cleanly instead of returning a
+  cross-domain enum. The curated baseline merge in `emitter.py` then fills
+  the gap with verified states. Output schema of `tmf_data.json` is
+  unchanged — this is a fully backwards-compatible patch release.
+
 ## [0.2.4] — 2026-04-25
 
 ### Fixed
