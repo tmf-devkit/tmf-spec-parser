@@ -389,3 +389,130 @@ def cache_clear(cache_dir: str) -> None:
     console.print(
         f"[green]✓[/green] Removed {removed} cached file(s) from {path}"
     )
+
+
+# ── oda ────────────────────────────────────────────────────────────────────────
+@main.command()
+@click.option(
+    "--out", "-o", default="oda_data.json", show_default=True,
+    help="Output path for oda_data.json.",
+)
+@click.option("--js", is_flag=True, default=False,
+              help="Also emit oda_data.js (ES module) alongside the JSON.")
+@click.option("--refresh", "-r", is_flag=True, default=False,
+              help="Bypass local cache and re-download all manifests from GitHub.")
+@click.option("--components", "-c", default=None,
+              help="Comma-separated component IDs to process, e.g. "
+                   "TMFC008,TMFC037. Defaults to all.")
+def oda(out: str, js: bool, refresh: bool, components: str | None) -> None:
+    """Fetch ODA Component (ODAC) manifests and generate oda_data.json."""
+    # Lazy imports so the rest of the CLI doesn't pay the pyyaml import cost.
+    try:
+        import yaml  # noqa: F401
+    except ImportError:
+        console.print(
+            "[red]The 'oda' command requires PyYAML. Install with:[/red]\n"
+            "  pip install 'tmf-spec-parser[yaml]'\n"
+            "or\n  pip install pyyaml"
+        )
+        sys.exit(1)
+
+    from tmf_spec_parser.config import (
+        ODA_GITHUB_ORG,
+        ODA_GITHUB_REPO,
+        ODA_REPO_REF,
+    )
+    from tmf_spec_parser.oda_emitter import (
+        build as oda_build,
+    )
+    from tmf_spec_parser.oda_emitter import (
+        write_js_module as oda_write_js,
+    )
+    from tmf_spec_parser.oda_emitter import (
+        write_json as oda_write_json,
+    )
+    from tmf_spec_parser.oda_extractor import parse_manifest
+    from tmf_spec_parser.oda_fetcher import (
+        DEFAULT_ODA_CACHE_DIR,
+        fetch_all_manifests,
+    )
+
+    component_filter: list[str] | None = None
+    if components:
+        component_filter = [c.strip().upper() for c in components.split(",") if c.strip()]
+
+    output_path = Path(out)
+
+    console.print(Panel(
+        f"[bold cyan]tmf-spec-parser oda[/bold cyan] v{__version__}\n"
+        f"Source: {ODA_GITHUB_ORG}/{ODA_GITHUB_REPO}@{ODA_REPO_REF}\n"
+        f"Components: {', '.join(component_filter) if component_filter else 'all'}\n"
+        f"Output: {output_path}\n"
+        f"Cache: {DEFAULT_ODA_CACHE_DIR}",
+        title="ODA Component manifests", border_style="cyan",
+    ))
+
+    # ── 1. Fetch ─────────────────────────────────────────────────────────────────────────
+    with console.status("[cyan]Fetching ODAC manifests from GitHub…"):
+        manifests = fetch_all_manifests(
+            refresh=refresh,
+            component_filter=component_filter,
+        )
+
+    if not manifests:
+        console.print(
+            "[red]No manifests fetched. Check network or set GITHUB_TOKEN.[/red]"
+        )
+        sys.exit(1)
+
+    console.print(
+        f"[green]✓[/green] Fetched {len(manifests)} manifest(s)"
+    )
+
+    # ── 2. Parse ─────────────────────────────────────────────────────────────────────────
+    import yaml
+    parsed = []
+    skipped: list[str] = []
+    for cid, text in sorted(manifests.items()):
+        try:
+            doc = yaml.safe_load(text)
+        except yaml.YAMLError as exc:
+            skipped.append(f"{cid} (YAML parse error: {exc})")
+            continue
+        comp = parse_manifest(doc)
+        if comp is None:
+            skipped.append(f"{cid} (manifest did not parse cleanly)")
+            continue
+        parsed.append(comp)
+
+    if skipped:
+        console.print(
+            f"[yellow]Skipped {len(skipped)} manifest(s):[/yellow]"
+        )
+        for line in skipped:
+            console.print(f"  [yellow]• {line}[/yellow]")
+
+    console.print(
+        f"[green]✓[/green] Parsed {len(parsed)} component(s)"
+    )
+
+    # ── 3. Build & write ───────────────────────────────────────────────────────────────────
+    data = oda_build(parsed)
+    oda_write_json(data, output_path)
+    console.print(f"[green]✓[/green] Written: {output_path}")
+
+    if js:
+        js_path = output_path.with_suffix(".js")
+        oda_write_js(data, js_path)
+        console.print(f"[green]✓[/green] Written: {js_path}")
+
+    stats = data["stats"]
+    console.print(
+        f"\n[bold green]Done.[/bold green] "
+        f"{stats['components']} component(s), "
+        f"{stats['exposed_api_count']} exposed APIs, "
+        f"{stats['dependent_api_count']} dependent APIs, "
+        f"{stats['unique_apis_referenced']} unique APIs referenced "
+        f"({stats.get('apis_outside_tmf_map_set', 0)} outside tmf-map's 16-API set)."
+    )
+

@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tmf-spec-parser"
-version = "0.2.6"
-description = "Extract, validate and diff TMForum Open API specs — generates tmf_data.json for tmf-map and other TMF DevKit tools"
+version = "0.3.0"
+description = "Extract, validate and diff TMForum Open API specs and ODA Component manifests — generates tmf_data.json + oda_data.json for tmf-map and other TMF DevKit tools"
 readme = "README.md"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Manoj Chavan", email = "manoj.chavan23@gmail.com" }]

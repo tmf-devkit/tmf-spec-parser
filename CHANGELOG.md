@@ -3,6 +3,56 @@
 All notable changes to tmf-spec-parser are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.3.0] — 2026-04-27
+
+### Added
+- **`oda` subcommand** — fetches ODA Component (ODAC) manifests from the
+  TM Forum components staging repo (`tmforum-rand/TMForum-ODA-Ready-for-publication`,
+  pinned to tag `v1.0.0`, 37 components) and emits `oda_data.json`. Optional
+  `--js` flag also writes an ES module sibling. This is the data layer for the
+  upcoming Component view in tmf-map, addressing the LinkedIn feedback that the
+  current map is at the API schema-`$ref` layer rather than the architectural
+  ODA Component layer.
+  ```
+  tmf-spec-parser oda --out ../tmf-map/src/oda_data.json --js
+  tmf-spec-parser oda --components TMFC008,TMFC037   # subset
+  ```
+- New modules `tmf_spec_parser.oda_extractor`, `tmf_spec_parser.oda_fetcher`,
+  `tmf_spec_parser.oda_emitter`. The extractor handles all three CRD versions
+  found in the wild (`v1beta2`, `v1beta3`, `v1`) via a normalisation layer
+  keyed off the `apiVersion` field. v1beta4 is folded into `v1` (the v1 GA
+  was a rename).
+- New config entries: `ODA_GITHUB_ORG`, `ODA_GITHUB_REPO`, `ODA_REPO_REF`,
+  `ODA_CRD_VERSIONS`, `ODA_SPEC_SOURCE`. The existing `tmforum-apis` config
+  is untouched.
+- Architecture decision record `docs/ADR-001-odac-source-and-schema.md`
+  documenting the source choice, CRD version handling, output schema, and
+  scope decisions.
+- Tests: `tests/test_oda_extractor.py` (17 tests covering all three CRD
+  shapes, placeholder filtering, missing fields, kind/case insensitivity)
+  and `tests/test_oda_emitter.py` (9 tests covering build, write_json,
+  write_js_module, parent-directory creation).
+
+### Scope
+- v0.3.0 extracts only `coreFunction.exposedAPIs` and
+  `coreFunction.dependentAPIs`. `securityFunction`, `managementFunction`,
+  `eventNotification`, per-API `resources[]`, eTOMs, SIDs, owners and
+  maintainers are deliberately out of scope. See ADR-001 for rationale.
+- The `required` flag is preserved on every API entry and link, ready for
+  mandatory/optional edge styling in the renderer.
+- APIs outside tmf-map's existing 16-API set are emitted unfiltered — the
+  renderer will decide how to display them. A `stats.apis_outside_tmf_map_set`
+  count surfaces this for visibility.
+
+### Behaviour
+- The existing `generate` subcommand and its output (`tmf_data.json`) are
+  unchanged. v0.3.0 is fully backwards-compatible — no breaking changes to
+  any existing public surface.
+- PyYAML is imported lazily inside the `oda` subcommand. Users on a default
+  `pip install tmf-spec-parser` (without the `[yaml]` extra) get a friendly
+  error message rather than an `ImportError`. Install with
+  `pip install 'tmf-spec-parser[yaml]'` or `pip install pyyaml` separately.
+
 ## [0.2.6] — 2026-04-26
 
 ### Fixed

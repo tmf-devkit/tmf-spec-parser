@@ -111,6 +111,24 @@ GITHUB_RAW_BASE = (
 )
 GITHUB_API_BASE = "https://api.github.com/repos/{org}/{repo}/contents/"
 
+# ── ODA Component manifests ───────────────────────────────────────────────────
+# The official staging repo for ODA Component (ODAC) YAML manifests, declared
+# in tmforum-oda/oda-ca-docs as "the definitive repo for delivered Components".
+# At tag v1.0.0 there are 37 components, each in its own folder named
+# TMFC{nnn}-{Name} (e.g. TMFC008-ServiceInventory).
+ODA_GITHUB_ORG  = "tmforum-rand"
+ODA_GITHUB_REPO = "TMForum-ODA-Ready-for-publication"
+ODA_REPO_REF    = "v1.0.0"  # Tag pinned to known-good release.
+
+# Manifests use one of three CRD versions in the wild — the extractor must
+# normalise across all three (see oda_extractor.py).
+ODA_CRD_VERSIONS = ("v1", "v1beta3", "v1beta2")
+
+# Spec source identifier embedded in oda_data.json for traceability.
+ODA_SPEC_SOURCE = (
+    f"github.com/{ODA_GITHUB_ORG}/{ODA_GITHUB_REPO}@{ODA_REPO_REF}"
+)
+
 # ── Cross-API schema → API mapping (curated) ─────────────────────────────────
 SCHEMA_TO_API: dict[str, str] = {
     # Service domain
