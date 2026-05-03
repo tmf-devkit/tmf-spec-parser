@@ -3,6 +3,34 @@
 All notable changes to tmf-spec-parser are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.3.1] — 2026-05-03
+
+### Fixed
+- **`oda` subcommand now extracts APIs from all three function blocks** —
+  not just `coreFunction`. ODAC manifests in the wild use
+  `coreFunction.exposedAPIs/dependentAPIs` for primary semantics, but every
+  manifest also declares `securityFunction.exposedAPIs` (typically TMF669
+  party-role-management-api, marked required) and many declare APIs in
+  `managementFunction.dependentAPIs`. The previous v0.3.0 extractor read
+  `coreFunction` only, dropping 35+ required exposed APIs across the 35
+  components in the v1.0.0 source. v0.3.1 reads all three blocks; placeholder
+  template IDs in `managementFunction` (`exposedAPI_id`, `dependentAPI_id`)
+  continue to be filtered by the existing TMF-prefix check.
+
+### Changed
+- `APIRef` dataclass gains a `function` field (`"core" | "security" |
+  "management"`) recording which function block each entry came from.
+  Defaults to `"core"` for backward compatibility with code that constructs
+  `APIRef` instances directly. The field is included in `to_dict()` output
+  and therefore in `oda_data.json` / `oda_data.js`, allowing downstream
+  consumers (e.g. tmf-map) to group, filter, or style edges by function.
+
+### Notes
+- Re-running `tmf-spec-parser oda` against the pinned `v1.0.0` source will
+  now report a higher `exposed_api_count` and `unique_apis_referenced`
+  total. The TMF669 reference is the largest single contributor, appearing
+  in all 35 components' security blocks.
+
 ## [0.3.0] — 2026-04-27
 
 ### Added

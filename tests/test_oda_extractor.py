@@ -340,7 +340,110 @@ def test_apiref_to_dict_round_trip() -> None:
         "name": "svc-inv",
         "version": "v4.0.0",
         "required": True,
+        "function": "core",
     }
+
+
+def test_apiref_function_defaults_to_core() -> None:
+    ref = APIRef(id="TMF638", name="svc-inv", version="v4.0.0", required=True)
+    assert ref.function == "core"
+
+
+# ── Multi-function-block extraction (TMF669 fix) ──────────────────────────────
+
+MULTI_FUNCTION_FIXTURE = """
+apiVersion: oda.tmforum.org/v1
+kind: Component
+metadata:
+  name: components.oda.tmforum.org
+spec:
+  componentMetadata:
+    id: TMFC999
+    name: ExampleComponent
+    version: 1.0.0
+    description: A fixture exercising all three function blocks.
+    publicationDate: 2025-01-01 00:00:00
+    status: specified
+    functionalBlock: CoreCommerce
+  coreFunction:
+    exposedAPIs:
+    - id: TMF620
+      name: product-catalog-management-api
+      required: true
+      specification:
+      - url: https://example.com/TMF620.json
+        version: v4.1.0
+    dependentAPIs:
+    - id: TMF632
+      name: party-management-api
+      required: false
+      specification:
+      - url: https://example.com/TMF632.json
+        version: v4.0.0
+  securityFunction:
+    exposedAPIs:
+    - id: TMF669
+      name: party-role-management-api
+      required: true
+      specification:
+      - url: https://example.com/TMF669.json
+        version: v4.0.0
+  managementFunction:
+    exposedAPIs:
+    - name: metrics
+      apiType: prometheus
+      id: exposedAPI_id
+      version: exposedAPI_version
+      required: false
+    dependentAPIs:
+    - id: TMF688
+      name: event-management-api
+      required: false
+      specification:
+      - url: https://example.com/TMF688.json
+        version: v4.0.0
+"""
+
+
+def test_securityFunction_apis_are_extracted() -> None:
+    """TMF669 sits in securityFunction.exposedAPIs in every real ODAC
+    manifest and was previously dropped on the floor."""
+    comp = parse_manifest(yaml.safe_load(MULTI_FUNCTION_FIXTURE))
+    assert comp is not None
+    exposed_ids = {a.id for a in comp.exposed_apis}
+    assert "TMF669" in exposed_ids
+
+
+def test_function_field_records_provenance() -> None:
+    comp = parse_manifest(yaml.safe_load(MULTI_FUNCTION_FIXTURE))
+    assert comp is not None
+    by_id = {a.id: a for a in comp.exposed_apis + comp.dependent_apis}
+    assert by_id["TMF620"].function == "core"
+    assert by_id["TMF632"].function == "core"
+    assert by_id["TMF669"].function == "security"
+    assert by_id["TMF688"].function == "management"
+
+
+def test_managementFunction_real_TMF_apis_extracted_placeholders_dropped() -> None:
+    """managementFunction often contains both real TMF entries and template
+    placeholders. Real ones are kept, placeholder IDs are filtered."""
+    comp = parse_manifest(yaml.safe_load(MULTI_FUNCTION_FIXTURE))
+    assert comp is not None
+    all_ids = {a.id for a in comp.exposed_apis + comp.dependent_apis}
+    # Real TMF688 from managementFunction.dependentAPIs is preserved.
+    assert "TMF688" in all_ids
+    # Placeholder strings from the template are dropped.
+    assert "exposedAPI_id" not in all_ids
+    assert "dependentAPI_id" not in all_ids
+
+
+def test_securityFunction_apis_appear_in_exposed_not_dependent() -> None:
+    """TMF669 in securityFunction.exposedAPIs must end up in exposed_apis,
+    not dependent_apis."""
+    comp = parse_manifest(yaml.safe_load(MULTI_FUNCTION_FIXTURE))
+    assert comp is not None
+    assert "TMF669" in {a.id for a in comp.exposed_apis}
+    assert "TMF669" not in {a.id for a in comp.dependent_apis}
 
 
 def test_component_to_dict_includes_all_fields() -> None:

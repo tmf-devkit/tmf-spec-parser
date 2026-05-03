@@ -14,9 +14,12 @@ ODAC manifests use three different CRD versions in the wild:
 This module turns any of those shapes into a uniform internal record. Pure
 functions only, no I/O.
 
-Scope (per ADR-001): only `coreFunction.exposedAPIs` and
-`coreFunction.dependentAPIs`. Security and management functions, events,
-and per-API resources are deliberately out of scope for v0.3.0.
+Scope: extracts APIs from `coreFunction`, `securityFunction`, and
+`managementFunction` blocks. Each APIRef carries a `function` field
+recording its provenance ("core" / "security" / "management") so
+downstream consumers can group or filter by function block.
+
+Events and per-API resources remain out of scope.
 """
 
 from __future__ import annotations
@@ -28,12 +31,18 @@ from typing import Any
 # ── Records ────────────────────────────────────────────────────────────────────
 @dataclass
 class APIRef:
-    """A single API entry within coreFunction.exposedAPIs or dependentAPIs."""
+    """A single API entry within an exposedAPIs or dependentAPIs list.
+
+    The `function` field records which function block the entry came from:
+    "core", "security", or "management". Defaults to "core" for backward
+    compatibility with code that constructs APIRefs directly.
+    """
 
     id: str
     name: str
     version: str
     required: bool
+    function: str = "core"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -122,13 +131,16 @@ def _api_version_from_entry(entry: dict[str, Any]) -> str:
     return ""
 
 
-def _extract_api_list(entries: Any) -> list[APIRef]:
+def _extract_api_list(entries: Any, function: str = "core") -> list[APIRef]:
     """Turn a raw list of API entries into APIRef records.
 
     Skips entries without an `id` or with placeholder/boilerplate IDs (some
     v1 manifests leave literal strings like 'dependentAPI_id' in
     managementFunction templates — we drop anything that doesn't look like
     a real TMF API id).
+
+    `function` tags every emitted APIRef with the function block it came
+    from ("core" / "security" / "management").
     """
     out: list[APIRef] = []
     if not isinstance(entries, list):
@@ -145,6 +157,7 @@ def _extract_api_list(entries: Any) -> list[APIRef]:
                 name=str(entry.get("name", "")).strip(),
                 version=_api_version_from_entry(entry),
                 required=_coerce_required(entry.get("required")),
+                function=function,
             )
         )
     return out
@@ -213,9 +226,24 @@ def parse_manifest(manifest: dict[str, Any]) -> Component | None:
     if not meta["id"]:
         return None
 
-    core = spec.get("coreFunction", {})
-    if not isinstance(core, dict):
-        core = {}
+    def _block(name: str) -> dict[str, Any]:
+        block = spec.get(name, {})
+        return block if isinstance(block, dict) else {}
+
+    core       = _block("coreFunction")
+    security   = _block("securityFunction")
+    management = _block("managementFunction")
+
+    exposed: list[APIRef] = (
+        _extract_api_list(core.get("exposedAPIs"),       function="core")
+        + _extract_api_list(security.get("exposedAPIs"),   function="security")
+        + _extract_api_list(management.get("exposedAPIs"), function="management")
+    )
+    dependent: list[APIRef] = (
+        _extract_api_list(core.get("dependentAPIs"),       function="core")
+        + _extract_api_list(security.get("dependentAPIs"),   function="security")
+        + _extract_api_list(management.get("dependentAPIs"), function="management")
+    )
 
     return Component(
         id=meta["id"],
@@ -226,8 +254,8 @@ def parse_manifest(manifest: dict[str, Any]) -> Component | None:
         publication_date=meta["publication_date"],
         description=meta["description"],
         crd_version=crd_version,
-        exposed_apis=_extract_api_list(core.get("exposedAPIs")),
-        dependent_apis=_extract_api_list(core.get("dependentAPIs")),
+        exposed_apis=exposed,
+        dependent_apis=dependent,
     )
 
 
