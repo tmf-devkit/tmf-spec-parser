@@ -3,6 +3,29 @@
 All notable changes to tmf-spec-parser are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.3.3] — 2026-05-10
+
+### Fixed
+- **Parser separator corrected** — eTOM and FF entry strings in the ODAC YAMLs
+  use `|` as the field separator, not `_`. For example:
+  `"1.2.11|Product_Inventory_Management|v24.0"` not
+  `"1.2.11_Product_Inventory_Management_v24.0"`. The v0.3.2 parser split on
+  `_`, producing malformed ids like `"1.2.11|Product"`. Now splits on `|`;
+  underscores within the name segment are then replaced with spaces.
+
+### Added
+- **SID ABE extraction** — ODAC v1 YAMLs carry a `SIDs` field in
+  `componentMetadata` (e.g. `"Product_Domain|Product_ABE|Product_and_Offering_Instance_ABE|v25.0"`)
+  that was not previously extracted. Now parsed into `sid_abes` on each
+  component: `{domain, abe_l1, abe_l2, version}`. This completes the
+  full five-layer data pipeline (eTOM → SID → FF → ODAC → API) from
+  public YAML sources alone — no PDF scraping required.
+- New `SIDEntry` dataclass in `oda_extractor.py`.
+- New helpers `_parse_sid_entry` and `_parse_sid_list`.
+- `Component` gains `sid_abes: list[SIDEntry]` field (default `[]`).
+- `Component.to_dict()` serialises `sid_abes`.
+- 13 new SID-specific tests added to `tests/test_oda_extractor_framework.py`.
+
 ## [0.3.2] — 2026-05-10
 
 ### Added

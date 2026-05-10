@@ -16,13 +16,15 @@ from tmf_spec_parser.oda_extractor import (
     FrameworkEntry,
     _parse_framework_entry,
     _parse_framework_list,
+    _parse_sid_entry,
+    _parse_sid_list,
     parse_manifest,
 )
 
 # ── Fixtures ───────────────────────────────────────────────────────────────────
 
 # Abridged v1 manifest modelled on TMFC001 ProductCatalogManagement.
-# eTOM IDs come from GB921; FF IDs come from GB1033F.
+# Uses the real pipe-separated format: {id}|{Name_words}|{vN.M}
 V1_WITH_FRAMEWORK_FIELDS = """
 apiVersion: oda.tmforum.org/v1
 kind: Component
@@ -38,11 +40,14 @@ spec:
     status: specified
     functionalBlock: CoreCommerce
     eTOMs:
-      - 1.2.20_Product_Catalog_Lifecycle_Management_v23.0
-      - 1.1.19_Loyalty_Program_Management_v23.0
+      - 1.2.20|Product_Catalog_Lifecycle_Management|v23.0
+      - 1.1.19|Loyalty_Program_Management|v23.0
     functionalFrameworkFunctions:
-      - 3_Repository_Entity_Relations_Configuration_v23.0
-      - 4_Repository_Entity_Grouping_Configuration_v23.0
+      - 3|Repository_Entity_Relations_Configuration|v23.0
+      - 4|Repository_Entity_Grouping_Configuration|v23.0
+    SIDs:
+      - Product_Domain|Product_and_Offering_Instance_ABE|Product_ABE|v25.0
+      - Product_Domain|Loyalty_ABE|Loyalty_Program_ABE|v25.0
   coreFunction:
     exposedAPIs:
     - id: TMF620
@@ -127,7 +132,7 @@ spec:
 
 def test_parse_entry_full_etom() -> None:
     """Standard eTOM entry with id, multi-word name, and version token."""
-    fe = _parse_framework_entry("1.2.20_Product_Catalog_Lifecycle_Management_v23.0")
+    fe = _parse_framework_entry("1.2.20|Product_Catalog_Lifecycle_Management|v23.0")
     assert fe is not None
     assert fe.id == "1.2.20"
     assert fe.name == "Product Catalog Lifecycle Management"
@@ -136,7 +141,7 @@ def test_parse_entry_full_etom() -> None:
 
 def test_parse_entry_numeric_ff_id() -> None:
     """FF entries use integer IDs instead of dotted eTOM notation."""
-    fe = _parse_framework_entry("197_Customer_Product_Storage_v23.0")
+    fe = _parse_framework_entry("197|Customer_Product_Storage|v23.0")
     assert fe is not None
     assert fe.id == "197"
     assert fe.name == "Customer Product Storage"
@@ -144,7 +149,7 @@ def test_parse_entry_numeric_ff_id() -> None:
 
 
 def test_parse_entry_single_word_name() -> None:
-    fe = _parse_framework_entry("3_Repository_Entity_Relations_Configuration_v23.0")
+    fe = _parse_framework_entry("3|Repository_Entity_Relations_Configuration|v23.0")
     assert fe is not None
     assert fe.id == "3"
     assert fe.name == "Repository Entity Relations Configuration"
@@ -153,7 +158,7 @@ def test_parse_entry_single_word_name() -> None:
 
 def test_parse_entry_no_version_token() -> None:
     """Entry strings without a trailing version token still parse; version is ''."""
-    fe = _parse_framework_entry("1.4.4_Service_Quality_Management")
+    fe = _parse_framework_entry("1.4.4|Service_Quality_Management")
     assert fe is not None
     assert fe.id == "1.4.4"
     assert fe.name == "Service Quality Management"
@@ -162,7 +167,7 @@ def test_parse_entry_no_version_token() -> None:
 
 def test_parse_entry_version_with_multiple_dots() -> None:
     """Version tokens like v25.5 (two-part) should be detected and stripped."""
-    fe = _parse_framework_entry("1.2.11_Product_Inventory_Management_v25.5")
+    fe = _parse_framework_entry("1.2.11|Product_Inventory_Management|v25.5")
     assert fe is not None
     assert fe.version == "v25.5"
     assert "v25.5" not in fe.name
@@ -190,8 +195,8 @@ def test_parse_entry_id_only_no_name() -> None:
 
 def test_parse_list_two_etom_entries() -> None:
     entries = [
-        "1.2.20_Product_Catalog_Lifecycle_Management_v23.0",
-        "1.1.19_Loyalty_Program_Management_v23.0",
+        "1.2.20|Product_Catalog_Lifecycle_Management|v23.0",
+        "1.1.19|Loyalty_Program_Management|v23.0",
     ]
     result = _parse_framework_list(entries)
     assert len(result) == 2
@@ -302,15 +307,17 @@ def test_v1beta3_manifest_produces_empty_framework_lists() -> None:
 
 
 def test_framework_fields_appear_in_to_dict() -> None:
-    """to_dict() must include etom_processes and ff_functions so they are
-    serialised into oda_data.json."""
+    """to_dict() must include etom_processes, ff_functions, and sid_abes so they
+    are serialised into oda_data.json."""
     comp = parse_manifest(yaml.safe_load(V1_WITH_FRAMEWORK_FIELDS))
     assert comp is not None
     d = comp.to_dict()
     assert "etom_processes" in d
     assert "ff_functions" in d
+    assert "sid_abes" in d
     assert len(d["etom_processes"]) == 2
     assert len(d["ff_functions"]) == 2
+    assert len(d["sid_abes"]) == 2
 
 
 def test_framework_entry_dicts_have_id_name_version_keys() -> None:
@@ -329,3 +336,97 @@ def test_existing_api_fields_unaffected_by_framework_extraction() -> None:
     assert comp.exposed_apis[0].id == "TMF620"
     assert len(comp.dependent_apis) == 1
     assert comp.dependent_apis[0].id == "TMF632"
+
+
+# ── SID tests ──────────────────────────────────────────────────────────────────
+
+
+def test_parse_sid_entry_two_abe_levels() -> None:
+    """Standard SID entry: Domain | ABE L1 | ABE L2 | version."""
+    se = _parse_sid_entry("Product_Domain|Product_and_Offering_Instance_ABE|Product_ABE|v25.0")
+    assert se is not None
+    assert se.domain == "Product"
+    assert se.abe_l1 == "Product and Offering Instance ABE"
+    assert se.abe_l2 == "Product ABE"
+    assert se.version == "v25.0"
+
+
+def test_parse_sid_entry_one_abe_level() -> None:
+    """SID entry with only one ABE level — abe_l2 should be empty string."""
+    se = _parse_sid_entry("Service_Domain|Service_ABE|v25.0")
+    assert se is not None
+    assert se.domain == "Service"
+    assert se.abe_l1 == "Service ABE"
+    assert se.abe_l2 == ""
+    assert se.version == "v25.0"
+
+
+def test_parse_sid_entry_strips_domain_suffix() -> None:
+    """'_Domain' suffix on the first token must be stripped from the domain name."""
+    se = _parse_sid_entry("Resource_Domain|Resource_ABE|v25.0")
+    assert se is not None
+    assert se.domain == "Resource"
+    assert "Domain" not in se.domain
+
+
+def test_parse_sid_entry_no_version() -> None:
+    se = _parse_sid_entry("Product_Domain|Product_ABE")
+    assert se is not None
+    assert se.domain == "Product"
+    assert se.version == ""
+
+
+def test_parse_sid_entry_empty_returns_none() -> None:
+    assert _parse_sid_entry("") is None
+
+
+def test_parse_sid_entry_single_token_returns_none() -> None:
+    assert _parse_sid_entry("Product_Domain") is None
+
+
+def test_parse_sid_list_two_entries() -> None:
+    entries = [
+        "Product_Domain|Product_and_Offering_Instance_ABE|Product_ABE|v25.0",
+        "Product_Domain|Loyalty_ABE|Loyalty_Program_ABE|v25.0",
+    ]
+    result = _parse_sid_list(entries)
+    assert len(result) == 2
+    assert result[0].abe_l2 == "Product ABE"
+    assert result[1].abe_l2 == "Loyalty Program ABE"
+
+
+def test_parse_sid_list_none_returns_empty() -> None:
+    assert _parse_sid_list(None) == []
+
+
+def test_v1_sid_abes_extracted() -> None:
+    """SIDs field in a v1 manifest populates sid_abes on the Component."""
+    comp = parse_manifest(yaml.safe_load(V1_WITH_FRAMEWORK_FIELDS))
+    assert comp is not None
+    assert len(comp.sid_abes) == 2
+    domains = {s.domain for s in comp.sid_abes}
+    assert domains == {"Product"}
+    l2s = {s.abe_l2 for s in comp.sid_abes}
+    assert "Product ABE" in l2s
+    assert "Loyalty Program ABE" in l2s
+
+
+def test_v1_without_sids_returns_empty_list() -> None:
+    comp = parse_manifest(yaml.safe_load(V1_WITHOUT_FRAMEWORK_FIELDS))
+    assert comp is not None
+    assert comp.sid_abes == []
+
+
+def test_v1beta3_sid_abes_empty() -> None:
+    comp = parse_manifest(yaml.safe_load(V1BETA3_NO_FRAMEWORK))
+    assert comp is not None
+    assert comp.sid_abes == []
+
+
+def test_sid_abes_in_to_dict() -> None:
+    comp = parse_manifest(yaml.safe_load(V1_WITH_FRAMEWORK_FIELDS))
+    assert comp is not None
+    d = comp.to_dict()
+    assert "sid_abes" in d
+    for entry in d["sid_abes"]:
+        assert set(entry.keys()) == {"domain", "abe_l1", "abe_l2", "version"}

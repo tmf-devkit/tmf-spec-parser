@@ -31,7 +31,7 @@ from typing import Any
 # ── Records ────────────────────────────────────────────────────────────────────
 
 # Matches a trailing version token such as "v23.0" or "v25.5" at the end of the
-# underscore-separated entry strings used in eTOMs and functionalFrameworkFunctions.
+# pipe-separated entry strings used in eTOMs, functionalFrameworkFunctions, and SIDs.
 _FW_VERSION_RE = re.compile(r"^v\d+(?:\.\d+)*$")
 
 
@@ -41,15 +41,16 @@ class FrameworkEntry:
 
     Parsed from strings like::
 
-        "1.2.11_Product_Inventory_Management_v23.0"
-         → id="1.2.11", name="Product Inventory Management", version="v23.0"
+        "1.2.11|Product_Inventory_Management|v24.0"
+         → id="1.2.11", name="Product Inventory Management", version="v24.0"
 
-        "197_Customer_Product_Storage_v23.0"
-         → id="197", name="Customer Product Storage", version="v23.0"
+        "197|Customer_Product_Storage|v24.0"
+         → id="197", name="Customer Product Storage", version="v24.0"
 
-    The ``id`` is the first underscore-separated token. The ``version`` is the
-    last token when it looks like ``vN`` or ``vN.M`` (stripped from the name).
-    If no version token is found the version is ``""``.
+    The format is ``{id}|{Name_with_underscores}|{vN.M}``. The ``id`` is the
+    first pipe-separated token. The ``version`` is the last pipe-separated token
+    when it matches ``vN`` or ``vN.M``. Underscores in the name segment are
+    replaced with spaces.
     """
 
     id: str
@@ -60,25 +61,59 @@ class FrameworkEntry:
         return asdict(self)
 
 
+@dataclass
+class SIDEntry:
+    """A single SID ABE reference extracted from the ``SIDs`` field in a v1 manifest.
+
+    Parsed from strings like::
+
+        "Product_Domain|Product_and_Offering_Instance_ABE|Product_ABE|v25.0"
+         → domain="Product", abe_l1="Product and Offering Instance ABE",
+           abe_l2="Product ABE", version="v25.0"
+
+        "Product_Domain|Loyalty_ABE|Loyalty_Program_ABE|v25.0"
+         → domain="Product", abe_l1="Loyalty ABE",
+           abe_l2="Loyalty Program ABE", version="v25.0"
+
+    The last pipe-separated token is the version if it matches ``vN.M``.
+    The first token is the domain (strips trailing ``_Domain``).
+    Remaining tokens are ABE hierarchy levels (L1 and optionally L2).
+    """
+
+    domain: str
+    abe_l1: str
+    abe_l2: str   # empty string when only one ABE level is present
+    version: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+def _underscore_to_spaces(s: str) -> str:
+    """Replace underscores with spaces and strip leading/trailing whitespace."""
+    return s.replace("_", " ").strip()
+
+
 def _parse_framework_entry(raw: str) -> FrameworkEntry | None:
     """Parse one eTOM or FF entry string into a FrameworkEntry.
 
+    Format: ``{id}|{Name_words}|{vN.M}``
     Returns None if the string is empty or has no usable id token.
     """
     raw = raw.strip()
     if not raw:
         return None
-    parts = raw.split("_")
+    parts = raw.split("|")
     entry_id = parts[0].strip()
     if not entry_id:
         return None
-    # Detect a trailing version token and strip it from the name.
+    # Detect a trailing version token and strip it.
     version = ""
     name_parts = parts[1:]
-    if name_parts and _FW_VERSION_RE.match(name_parts[-1]):
-        version = name_parts[-1]
+    if name_parts and _FW_VERSION_RE.match(name_parts[-1].strip()):
+        version = name_parts[-1].strip()
         name_parts = name_parts[:-1]
-    name = " ".join(name_parts)
+    name = _underscore_to_spaces(" ".join(name_parts))
     return FrameworkEntry(id=entry_id, name=name, version=version)
 
 
@@ -96,6 +131,48 @@ def _parse_framework_list(entries: Any) -> list[FrameworkEntry]:
         fe = _parse_framework_entry(item)
         if fe is not None:
             out.append(fe)
+    return out
+
+
+def _parse_sid_entry(raw: str) -> SIDEntry | None:
+    """Parse one SID entry string into a SIDEntry.
+
+    Format: ``{Domain}_Domain|{ABE_L1}|[{ABE_L2}|]{vN.M}``
+    Returns None if the string is empty or has fewer than two tokens.
+    """
+    raw = raw.strip()
+    if not raw:
+        return None
+    parts = raw.split("|")
+    if len(parts) < 2:  # noqa: PLR2004
+        return None
+    # Strip trailing version token.
+    version = ""
+    if _FW_VERSION_RE.match(parts[-1].strip()):
+        version = parts[-1].strip()
+        parts = parts[:-1]
+    # First token is Domain_Domain → strip trailing "_Domain".
+    domain_raw = parts[0].strip()
+    domain = _underscore_to_spaces(
+        domain_raw[:-7] if domain_raw.endswith("_Domain") else domain_raw
+    )
+    abe_parts = [_underscore_to_spaces(p) for p in parts[1:]]
+    abe_l1 = abe_parts[0] if abe_parts else ""
+    abe_l2 = abe_parts[1] if len(abe_parts) > 1 else ""
+    return SIDEntry(domain=domain, abe_l1=abe_l1, abe_l2=abe_l2, version=version)
+
+
+def _parse_sid_list(entries: Any) -> list[SIDEntry]:
+    """Turn a raw YAML list of SID entry strings into SIDEntry records."""
+    out: list[SIDEntry] = []
+    if not isinstance(entries, list):
+        return out
+    for item in entries:
+        if not isinstance(item, str):
+            continue
+        se = _parse_sid_entry(item)
+        if se is not None:
+            out.append(se)
     return out
 
 
@@ -134,6 +211,7 @@ class Component:
     dependent_apis:  list[APIRef]        = field(default_factory=list)
     etom_processes:  list[FrameworkEntry] = field(default_factory=list)
     ff_functions:    list[FrameworkEntry] = field(default_factory=list)
+    sid_abes:        list[SIDEntry]       = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -149,6 +227,7 @@ class Component:
             "dependent_apis":   [a.to_dict() for a in self.dependent_apis],
             "etom_processes":   [e.to_dict() for e in self.etom_processes],
             "ff_functions":     [f.to_dict() for f in self.ff_functions],
+            "sid_abes":         [s.to_dict() for s in self.sid_abes],
         }
 
 
@@ -275,6 +354,7 @@ def _normalise_v1_metadata(spec: dict[str, Any]) -> dict[str, Any]:
         "ff_functions":     _parse_framework_list(
             meta.get("functionalFrameworkFunctions")
         ),
+        "sid_abes":         _parse_sid_list(meta.get("SIDs")),
     }
 
 
@@ -331,6 +411,7 @@ def parse_manifest(manifest: dict[str, Any]) -> Component | None:
     # flat-metadata (v1beta2/3) returns empty lists from _normalise_flat_metadata.
     etom_processes: list[FrameworkEntry] = meta.get("etom_processes") or []
     ff_functions:   list[FrameworkEntry] = meta.get("ff_functions")   or []
+    sid_abes:       list[SIDEntry]       = meta.get("sid_abes")       or []
 
     return Component(
         id=meta["id"],
@@ -345,6 +426,7 @@ def parse_manifest(manifest: dict[str, Any]) -> Component | None:
         dependent_apis=dependent,
         etom_processes=etom_processes,
         ff_functions=ff_functions,
+        sid_abes=sid_abes,
     )
 
 

@@ -463,5 +463,6 @@ def test_component_to_dict_includes_all_fields() -> None:
     assert d["dependent_apis"] == []
     assert d["etom_processes"] == []
     assert d["ff_functions"] == []
+    assert d["sid_abes"] == []
     assert "functional_block" in d
     assert "crd_version" in d
