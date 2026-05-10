@@ -3,6 +3,47 @@
 All notable changes to tmf-spec-parser are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.3.2] — 2026-05-10
+
+### Added
+- **eTOM and Functional Framework extraction from ODAC YAMLs** — v1 manifests
+  carry `eTOMs` and `functionalFrameworkFunctions` arrays in `componentMetadata`
+  that the extractor was previously dropping silently. Both fields are now
+  parsed into structured `FrameworkEntry` records (`id`, `name`, `version`) and
+  emitted as `etom_processes` and `ff_functions` lists on each component in
+  `oda_data.json`.
+
+  Entry strings follow the pattern `{id}_{Name_Words}_{vN.M}`, for example:
+  - `"1.2.20_Product_Catalog_Lifecycle_Management_v23.0"`
+    → `{"id": "1.2.20", "name": "Product Catalog Lifecycle Management", "version": "v23.0"}`
+  - `"197_Customer_Product_Storage_v23.0"`
+    → `{"id": "197", "name": "Customer Product Storage", "version": "v23.0"}`
+
+  The version token (trailing `v{digits}` or `v{digits}.{digits}`) is detected
+  and stripped from the name automatically. Entries without a version token
+  produce `"version": ""`.
+
+- New `FrameworkEntry` dataclass in `oda_extractor.py` with `id`, `name`,
+  `version` fields and a `to_dict()` method.
+- New public helpers `_parse_framework_entry` and `_parse_framework_list`
+  (exported from `oda_extractor` for testability).
+- `Component` dataclass gains two new fields: `etom_processes` and
+  `ff_functions` (both `list[FrameworkEntry]`, default `[]`).
+- `Component.to_dict()` serialises both new fields; they appear in
+  `oda_data.json` and `oda_data.js`.
+- 20 new tests in `tests/test_oda_extractor_framework.py` covering parser
+  helpers, component-level extraction, v1beta2/v1beta3 empty-list behaviour,
+  serialisation, and non-regression on API fields.
+
+### Behaviour
+- v1beta2 and v1beta3 manifests never carried these fields and continue to
+  produce `etom_processes: []` and `ff_functions: []`. Fully backwards-compatible.
+- The eTOM IDs in the output (`1.2.20`, `1.4.4`, etc.) are the same L2
+  identifiers in the GB921 Excel and can be joined directly once the Excel is
+  available locally. tmf-map does not yet render the Frameworx view — this
+  release is the data layer only.
+- No changes to `tmf_data.json` schema or the `generate` subcommand.
+
 ## [0.3.1] — 2026-05-03
 
 ### Fixed

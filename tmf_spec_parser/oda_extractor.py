@@ -24,11 +24,81 @@ Events and per-API resources remain out of scope.
 
 from __future__ import annotations
 
+import re
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-
 # ── Records ────────────────────────────────────────────────────────────────────
+
+# Matches a trailing version token such as "v23.0" or "v25.5" at the end of the
+# underscore-separated entry strings used in eTOMs and functionalFrameworkFunctions.
+_FW_VERSION_RE = re.compile(r"^v\d+(?:\.\d+)*$")
+
+
+@dataclass
+class FrameworkEntry:
+    """A single eTOM process or Functional Framework function reference.
+
+    Parsed from strings like::
+
+        "1.2.11_Product_Inventory_Management_v23.0"
+         → id="1.2.11", name="Product Inventory Management", version="v23.0"
+
+        "197_Customer_Product_Storage_v23.0"
+         → id="197", name="Customer Product Storage", version="v23.0"
+
+    The ``id`` is the first underscore-separated token. The ``version`` is the
+    last token when it looks like ``vN`` or ``vN.M`` (stripped from the name).
+    If no version token is found the version is ``""``.
+    """
+
+    id: str
+    name: str
+    version: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+def _parse_framework_entry(raw: str) -> FrameworkEntry | None:
+    """Parse one eTOM or FF entry string into a FrameworkEntry.
+
+    Returns None if the string is empty or has no usable id token.
+    """
+    raw = raw.strip()
+    if not raw:
+        return None
+    parts = raw.split("_")
+    entry_id = parts[0].strip()
+    if not entry_id:
+        return None
+    # Detect a trailing version token and strip it from the name.
+    version = ""
+    name_parts = parts[1:]
+    if name_parts and _FW_VERSION_RE.match(name_parts[-1]):
+        version = name_parts[-1]
+        name_parts = name_parts[:-1]
+    name = " ".join(name_parts)
+    return FrameworkEntry(id=entry_id, name=name, version=version)
+
+
+def _parse_framework_list(entries: Any) -> list[FrameworkEntry]:
+    """Turn a raw YAML list of framework entry strings into FrameworkEntry records.
+
+    Non-string and empty entries are skipped silently.
+    """
+    out: list[FrameworkEntry] = []
+    if not isinstance(entries, list):
+        return out
+    for item in entries:
+        if not isinstance(item, str):
+            continue
+        fe = _parse_framework_entry(item)
+        if fe is not None:
+            out.append(fe)
+    return out
+
+
 @dataclass
 class APIRef:
     """A single API entry within an exposedAPIs or dependentAPIs list.
@@ -60,8 +130,10 @@ class Component:
     publication_date: str
     description: str
     crd_version: str
-    exposed_apis:   list[APIRef] = field(default_factory=list)
-    dependent_apis: list[APIRef] = field(default_factory=list)
+    exposed_apis:    list[APIRef]        = field(default_factory=list)
+    dependent_apis:  list[APIRef]        = field(default_factory=list)
+    etom_processes:  list[FrameworkEntry] = field(default_factory=list)
+    ff_functions:    list[FrameworkEntry] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -75,6 +147,8 @@ class Component:
             "crd_version":      self.crd_version,
             "exposed_apis":     [a.to_dict() for a in self.exposed_apis],
             "dependent_apis":   [a.to_dict() for a in self.dependent_apis],
+            "etom_processes":   [e.to_dict() for e in self.etom_processes],
+            "ff_functions":     [f.to_dict() for f in self.ff_functions],
         }
 
 
@@ -176,11 +250,15 @@ def _normalise_flat_metadata(spec: dict[str, Any]) -> dict[str, str]:
     }
 
 
-def _normalise_v1_metadata(spec: dict[str, Any]) -> dict[str, str]:
+def _normalise_v1_metadata(spec: dict[str, Any]) -> dict[str, Any]:
     """Pull metadata from v1's spec.componentMetadata wrapper.
 
     Falls back to flat fields if the wrapper is missing — some early v1
     manifests in the wild are still half-migrated.
+
+    The ``eTOMs`` and ``functionalFrameworkFunctions`` lists are only present
+    in v1 manifests (they were added as part of the v1 spec). They are parsed
+    here and returned as ``etom_processes`` and ``ff_functions`` keys.
     """
     meta = spec.get("componentMetadata")
     if not isinstance(meta, dict):
@@ -193,6 +271,10 @@ def _normalise_v1_metadata(spec: dict[str, Any]) -> dict[str, str]:
         "status":           _clean_text(meta.get("status")),
         "publication_date": _clean_text(meta.get("publicationDate")),
         "description":      _clean_text(meta.get("description")),
+        "etom_processes":   _parse_framework_list(meta.get("eTOMs")),
+        "ff_functions":     _parse_framework_list(
+            meta.get("functionalFrameworkFunctions")
+        ),
     }
 
 
@@ -245,6 +327,11 @@ def parse_manifest(manifest: dict[str, Any]) -> Component | None:
         + _extract_api_list(management.get("dependentAPIs"), function="management")
     )
 
+    # eTOM and FF cross-references are only present in v1 manifests;
+    # flat-metadata (v1beta2/3) returns empty lists from _normalise_flat_metadata.
+    etom_processes: list[FrameworkEntry] = meta.get("etom_processes") or []
+    ff_functions:   list[FrameworkEntry] = meta.get("ff_functions")   or []
+
     return Component(
         id=meta["id"],
         name=meta["name"],
@@ -256,6 +343,8 @@ def parse_manifest(manifest: dict[str, Any]) -> Component | None:
         crd_version=crd_version,
         exposed_apis=exposed,
         dependent_apis=dependent,
+        etom_processes=etom_processes,
+        ff_functions=ff_functions,
     )
 
 

@@ -461,5 +461,7 @@ def test_component_to_dict_includes_all_fields() -> None:
     assert d["id"] == "TMFC008"
     assert d["exposed_apis"] == []
     assert d["dependent_apis"] == []
+    assert d["etom_processes"] == []
+    assert d["ff_functions"] == []
     assert "functional_block" in d
     assert "crd_version" in d
